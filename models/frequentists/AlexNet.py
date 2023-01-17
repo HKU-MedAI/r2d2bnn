@@ -38,4 +38,29 @@ class AlexNet(nn.Module):
         self.pool3 = nn.MaxPool2d(kernel_size=1, stride=2)
 
         self.flatten = FlattenLayer(1 * 1 * 256)
-        self.classifier = nn.Linear(1 * 1 * 256, outputs, bias=True)
+        self.fc = nn.Linear(1 * 1 * 256, outputs, bias=True)
+
+    def forward(self, x):
+
+        x = self.conv1(x)
+        x = self.act1(x)
+        x = self.pool1(x)
+
+        x = self.conv2(x)
+        x = self.act2(x)
+        x = self.pool2(x)
+
+        x = self.conv3(x)
+        x = self.act3(x)
+
+        x = self.conv4(x)
+        x = self.act4(x)
+
+        x = self.conv5(x)
+        x = self.act5(x)
+        x = self.pool3(x)
+
+        x = self.flatten(x)
+        x = self.fc(x)
+
+        return x

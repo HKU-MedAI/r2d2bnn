@@ -4,17 +4,15 @@ import random
 import torch
 import yaml
 
-from evaluators import (
-    BPNEvaluator,
-    BPNSSLEvaluator,
-    BPNMdisEvaluator,
-    FrequentistEvaluator
-)
 from globals import *
 from trainer import (
+    CNNTrainer,
+    CNNMCDropoutTrainer,
     BNNTrainer,
+    BLinearRegTrainer,
     BNNHorseshoeTrainer,
-    FrequentistTrainer,
+    R2D2BNNTrainer,
+    BNNUncertaintyTrainer
 )
 from utils import ordered_yaml
 
@@ -25,7 +23,7 @@ parser.add_argument('-seed', type=int, help='random seed of the run', default=61
 args = parser.parse_args()
 
 opt_path = args.config
-default_config_path = "HorseshoeLeNet_CIFAR10.yml"
+default_config_path = "CNN_CIFAR10.yml"
 
 if opt_path == "":
     opt_path = CONFIG_DIR / default_config_path
@@ -51,26 +49,23 @@ def main():
     if mode == "train":
         if config["train_type"] == "bnn":
             trainer = BNNTrainer(config)
+        elif config["train_type"] == "cnn":
+            trainer = CNNTrainer(config)
+        elif config["train_type"] == "cnn-mc":
+            trainer = CNNMCDropoutTrainer(config)
         elif config["train_type"] == "bnn-horseshoe":
             trainer = BNNHorseshoeTrainer(config)
-        elif config["train_type"] == "freq":
-            trainer = FrequentistTrainer(config)
+        elif config["train_type"] == "bnn-r2d2":
+            trainer = R2D2BNNTrainer(config)
+        elif config["train_type"] == "bnn-linreg":
+            trainer = BLinearRegTrainer(config)
+        elif config["train_type"] == "bnn-uncertainty":
+            trainer = BNNUncertaintyTrainer(config)
         else:
             raise NotImplementedError(f"Trainer of type {config['train_type']} is not implemented")
         trainer.train()
-    elif mode == "eval":
-        if config["eval_type"] == "bpn":
-            evaluator = BPNEvaluator(config)
-        elif config["eval_type"] == "bpn-ssl":
-            evaluator = BPNSSLEvaluator(config)
-        elif config["eval_type"] == "bpn-mdis":
-            evaluator = BPNMdisEvaluator(config)
-        elif config["eval_type"] == "freq":
-            evaluator = FrequentistEvaluator(config)
-        else:
-            raise NotImplementedError(f"Evaluator of type {config['eval_type']} is not implemented")
-        # evaluator.plot_all()
-        evaluator.plot_tpr_fpr()
+    else:
+        raise NotImplementedError("This mode is not implemented")
 
 
 if __name__ == "__main__":

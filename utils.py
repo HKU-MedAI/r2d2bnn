@@ -67,5 +67,5 @@ def metrics(outputs, targets, average='binary'):
         fpr, tpr, thresholds = roc_curve(targets, preds)
         aucroc = auc(fpr, tpr)
     else:
-        aucroc= roc_auc_score(targets, outputs, multi_class='ovo')
+        aucroc= roc_auc_score(targets, outputs, multi_class='ovr', average="weighted")
     return precision, recall, f1, aucroc

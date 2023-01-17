@@ -147,6 +147,12 @@ class CheckpointManager:
         self.save_version(self.version)
 
         # Save training stats here
+        # Format epoch stat
+        for s, v in epoch_stats.items():
+            if type(v) != int:
+                epoch_stats[s] = round(v, 5)
+
+        # Save training stats here
         self.append_stats(epoch_stats)
 
         # Save model state dicts

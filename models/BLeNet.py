@@ -62,10 +62,13 @@ class BBBLeNet(nn.Module):
 
         x = self.fc3(x)
 
+        return x
+
+    def kl_loss(self):
         # Compute KL divergences
         kl = 0.0
-        for module in self.modules():
+        for module in self.children():
             if hasattr(module, 'kl_loss'):
                 kl = kl + module.kl_loss()
 
-        return x, kl
+        return kl

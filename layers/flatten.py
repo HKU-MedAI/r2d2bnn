@@ -7,7 +7,7 @@ class FlattenLayer(nn.Module):
         self.num_features = num_features
 
     def forward(self, x):
-        return x.view(-1, self.num_features)
+        return x.reshape(-1, self.num_features)
 
 
 class ReverseFlattenLayer(nn.Module):

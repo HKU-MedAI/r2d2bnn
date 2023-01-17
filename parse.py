@@ -3,12 +3,18 @@ import torch.nn.functional as F
 
 from models import (
     BBB3Conv3FC,
+    BBBMultipleLinear,
     BBBLeNet,
-    BBBAlexNet2,
+    BBBAlexNet,
+    BBBHorseshoeAlexNet,
     BBBResNet,
-    BBBConvNet,
+    BBBHorseshoeCNN,
     BBBHorseshoeLeNet,
-    ResNet
+    BBBR2D2LeNet,
+    BBBR2D2AlexNet,
+    BBBR2D2CNN,
+    ResNet,
+    CNN,
 )
 from models.frequentists import LeNet, EfficientNetB4, AlexNet
 from torchvision.models import resnet18, resnet50
@@ -72,35 +78,23 @@ def parse_loss(config_train):
         raise NotImplementedError("This Loss is not implemented")
 
 
-def parse_bayesian_model(config_train, classifier: str = None):
+def parse_bayesian_model(config_train, image_size=32):
     # Read input and output dimension
     in_dim = config_train["in_channels"]
     out_dim = config_train["out_channels"]
 
     model_name = config_train["model_name"]
 
-    if model_name in ["BCNN", "BLeNet", "BAlexNet2"]:
+    # Read priors for BNNs
+    if model_name in ["BCNN", "BLeNet", "BAlexNet"]:
         priors = {
             'prior_mu': config_train["prior_mu"],
             'prior_sigma': config_train["prior_sigma"],
             'posterior_mu_initial': config_train["posterior_mu_initial"],
             'posterior_rho_initial': config_train["posterior_rho_initial"],
         }
-
-    if model_name == "BCNN":
-        return BBB3Conv3FC(
-            outputs=out_dim,
-            inputs=in_dim,
-            priors=priors
-        )
-    elif model_name == "BLeNet":
-        return BBBLeNet(
-            outputs=out_dim,
-            inputs=in_dim,
-            priors=priors
-        )
-    elif model_name == "HorseshoeLeNet":
-        parameters = {
+    elif model_name in ["HorseshoeLeNet", "BHorseshoeAlexNet", "HorseshoeCNN"]:
+        priors = {
             "horseshoe_scale": config_train["horseshoe_scale"],
             "global_cauchy_scale": config_train["global_cauchy_scale"],
             "weight_cauchy_scale": config_train["weight_cauchy_scale"],
@@ -111,24 +105,92 @@ def parse_bayesian_model(config_train, classifier: str = None):
             "log_v_mean": config_train["log_v_mean"],
             "log_v_rho_scale": config_train["log_v_rho_scale"]
         }
+    elif model_name in ["R2D2AlexNet", "R2D2LeNet", "R2D2CNN"]:
+        priors = {
+            "r2d2_scale": config_train["r2d2_scale"],
+            "prior_phi_prob": config_train["prior_phi_prob"],
+            "prior_psi_shape": config_train["prior_psi_shape"],
+            "beta_rho_scale": config_train["beta_rho_scale"],
+            "bias_rho_scale": config_train["bias_rho_scale"],
+            "weight_xi_shape": config_train["weight_xi_shape"],
+            "weight_omega_shape": config_train["weight_omega_shape"],
+        }
+    else:
+        priors = None
+
+    if model_name == "BCNN":
+        n_blocks = config_train["n_blocks"]
+        return BBB3Conv3FC(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            n_blocks=n_blocks
+        )
+    elif model_name == "BMLP":
+        n_blocks = config_train["n_blocks"]
+        return BBBMultipleLinear(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            n_blocks=n_blocks
+        )
+    elif model_name == "BLeNet":
+        return BBBLeNet(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            image_size=image_size
+        )
+    elif model_name == "HorseshoeLeNet":
         return BBBHorseshoeLeNet(
             outputs=out_dim,
             inputs=in_dim,
-            priors=parameters
+            priors=priors
         )
-    elif model_name == "BAlexNet2":
-        model = BBBAlexNet2(
+    elif model_name == "HorseshoeCNN":
+        n_blocks = config_train["n_blocks"]
+        return BBBHorseshoeCNN(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            n_blocks=n_blocks
+        )
+    elif model_name == "R2D2CNN":
+        n_blocks = config_train["n_blocks"]
+        return BBBR2D2CNN(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            n_blocks=n_blocks
+        )
+    elif model_name == "R2D2LeNet":
+        return BBBR2D2LeNet(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            image_size=image_size
+        )
+    elif model_name == "R2D2AlexNet":
+        return BBBR2D2AlexNet(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors
+        )
+    elif model_name == "BAlexNet":
+        model = BBBAlexNet(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            image_size=image_size
+        )
+        return model
+    elif model_name == "BHorseshoeAlexNet":
+        model = BBBHorseshoeAlexNet(
             outputs=out_dim,
             inputs=in_dim,
             priors=priors
         )
         return model
-    elif model_name == "BConvNet":
-        return BBBConvNet(
-            outputs=out_dim,
-            inputs=in_dim,
-            priors=priors
-        )
     elif model_name == "BResNet":
         return BBBResNet(
             outputs=out_dim,
@@ -165,6 +227,13 @@ def parse_frequentist_model(config_freq, image_size=32):
         return ResNet(
             outputs=out_dim,
             inputs=in_dim
+        )
+    elif model_name == "CNN":
+        n_blocks = config_freq["n_blocks"]
+        return CNN(
+            outputs=out_dim,
+            inputs=in_dim,
+            n_blocks=n_blocks
         )
     else:
         raise NotImplementedError("This Loss is not implemented")

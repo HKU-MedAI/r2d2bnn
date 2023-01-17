@@ -8,72 +8,103 @@ from torch.distributions import HalfCauchy, Dirichlet, Exponential
 from distributions import ReparametrizedGaussian, ScaleMixtureGaussian,\
     InverseGamma, Exponential, Gamma, InvGaussian, GeneralizedInvGaussian
 from scipy.special import loggamma
+from losses import calculate_kl
 
 
-class R2D2Layer(nn.Module):
+class R2D2LinearLayer(nn.Module):
     """
     Single linear layer of a R2D2 prior for regression
     """
-    def __init__(self, in_features, out_features, parameters, device):
+    def __init__(self, in_features, out_features, parameters):
         """
         Args:
             in_features: int, number of input features
             out_features: int, number of output features
-            parameters: instance of class HorseshoeHyperparameters
+            parameters: instance of class R2D2 Hyperparameters
             device: cuda device instance
         """
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.device = device
+        self.priors = parameters
 
         # Scale to initialize weights, according to Yingzhen's work
-        if parameters.horseshoe_scale == None:
+        if parameters["r2d2_scale"] == None:
             scale = 1. * np.sqrt(6. / (in_features + out_features))
         else:
-            scale = parameters.horseshoe_scale
-
-        # TODO: Maybe refer the the Refer to the Horseshoe BNN part on how to compute the theoretical ELBO
+            scale = parameters["r2d2_scale"]
 
         # Initialization of parameters of variational distribution
         # weight parameters
+        self.tot_dim = out_features * in_features
         self.beta_mean = nn.Parameter(torch.Tensor(out_features, in_features).uniform_(-scale, scale))
-        self.beta_rho = nn.Parameter(torch.ones([out_features, in_features]) * parameters.beta_rho_scale)
+        self.beta_rho = nn.Parameter(torch.ones([out_features, in_features]))
         self.beta_ = ReparametrizedGaussian(self.beta_mean, self.beta_rho)
 
         # bias parameters
-        self.bias_mean = nn.Parameter(torch.zeros([1, out_features], ))
-        self.bias_rho = nn.Parameter(torch.ones([1, out_features]) * parameters.bias_rho_scale)
+        self.bias_mean = nn.Parameter(torch.zeros([out_features], ))
+        self.bias_rho = nn.Parameter(torch.ones([out_features]))
         self.bias = ReparametrizedGaussian(self.bias_mean, self.bias_rho)
 
         # Initialization of parameters online
         # Initialization of distributions local shrinkage parameters
         # weight parameters
-        self.prior_psi_shape = torch.Tensor([0.5])
-        self.psi_ = Exponential(self.prior_psi_shape)
+        self.prior_psi_shape = parameters["prior_psi_shape"]
+        self.psi_ = Exponential(torch.ones(out_features, in_features) * self.prior_psi_shape)
         # Distribution of Phi_
-        self.a_pi = torch.Tensor([1])
-        self.phi_ = Dirichlet(self.a_pi)
+        self.a_pi = parameters["prior_phi_prob"]
+        self.phi_ = Dirichlet(torch.ones(out_features, in_features) * self.a_pi)
 
         # Initialization of Global shrinkage parameters
         # Distribution of Xi
-        self.prior_xi_shape = torch.Tensor([parameters.weight_xi_shape])
+        self.prior_xi_shape = torch.Tensor([parameters["weight_xi_shape"]])
         self.prior_xi_rate = torch.Tensor([1])
         self.xi_ = Gamma(self.prior_xi_shape, self.prior_xi_rate)
 
         # Distribution of Omega
-        self.prior_omega_rate = torch.Tensor([parameters.weight_omega_shape])
-        xi = self.xi_.sample(1)
-        self.omega_ = Gamma(self.prior_omega_rate, xi)
+        self.prior_omega_rate = torch.Tensor([parameters["weight_omega_shape"]])
+        self.xi = self.xi_.sample().squeeze()
+        self.omega_ = Gamma(self.tot_dim * self.a_pi, self.xi)
         self.psi = self.psi_.sample()
         self.phi = self.phi_.sample()
-        self.omega = self.omega_.sample()
-        self.xi = self.xi_.sample()
+        self.omega = self.omega_.sample().squeeze()
         self.beta = self.beta_.sample()
 
         # Initialization of distributions for Gibbs sampling
+        self.xi_gib = Gamma(self.a_pi + self.prior_xi_shape, 1 + self.omega)
+        self.omega_gib = GeneralizedInvGaussian(
+            chi=2 * torch.sum(self.beta ** 2 / (self.beta_.std_dev ** 2 * self.phi * self.psi)),
+            rho=2 * self.xi,
+            lamb=(self.a_pi - 1 / 2) * self.tot_dim
+        )
+        self.t_gib = GeneralizedInvGaussian(
+            chi=2 * self.beta ** 2 / (self.beta_.std_dev ** 2 * self.phi * self.psi),
+            rho=2 * self.xi,
+            lamb=self.a_pi - 1 / 2
+        )
+        self.psi_gib = GeneralizedInvGaussian(
+            chi=-1 / 2 * torch.ones(1),
+            rho=1 / torch.sqrt(self.beta_.std_dev ** 2 + self.phi * self.omega / 2) / torch.abs(self.beta),
+            lamb=torch.ones(1)
+        )
 
-    def forward(self, input_, sample=True, n_samples=1):
+        # Define prior quantities for calculating the KL loss
+        # TODO: Temporary solutions using Gaussian distribution - develop analytic form later
+        self.prior_mu = 0
+        self.prior_beta_sigma = torch.sqrt(self.phi * self.psi * self.omega * self.beta_.std_dev ** 2 / 2).detach()
+        self.prior_bias_sigma = self.bias.std_dev.detach()
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # self.W_mu.data.normal_(*self.posterior_mu_initial)
+        self.beta_rho.data.normal_(*self.priors["beta_rho_scale"])
+
+        # self.bias_mu.data.normal_(*self.posterior_mu_initial)
+        self.bias_rho.data.normal_(*self.priors["bias_rho_scale"])
+
+
+    def forward(self, input_, sample=True, n_samples=10):
         """
         Performs a forward pass through the layer, that is, computes
         the layer output for a given input batch.
@@ -85,25 +116,23 @@ class R2D2Layer(nn.Module):
 
         # Compute variance parameter
         # It is phi_j and psi_j for local shrinkage
-        phi = torch.unsqueeze(self.phi_.sample(n_samples), 1)
-        psi = torch.unsqueeze(self.psi_.sample(n_samples), 1)
-        xi = self.xi_.sample()
-        self.omega_.update(self.prior_omega_rate, xi)
-        omega = torch.unsqueeze(self.omega_.sample(n_samples), 1)
-        self.beta_sigma = torch.log1p(torch.exp(self.beta_rho)) * omega * xi / 2 * psi * phi
+        beta = self.beta_.sample(n_samples)
+        beta_eps = torch.empty(self.beta.size()).normal_(0, 1)
+        beta_sigma = torch.sqrt(self.beta_.std_dev ** 2 * self.omega * self.phi * self.psi / 2)
 
-        weight = self.beta_mean + self.beta_sigma
+        weight = beta + beta_sigma * beta_eps
 
         bias = self.bias.sample(n_samples)
 
         input_ = input_.expand(n_samples, -1, -1)
 
-        if self.device.type == 'cuda':
-            input_ = input_.cuda()
-            weight = weight.cuda()
-            bias = bias.cuda()
+        input_ = input_.cuda()
+        weight = weight.cuda()
+        bias = bias.cuda()
 
-        result = torch.einsum('bij,bkj->bik', [input_, weight]) + bias
+        self.beta = beta.squeeze()  # Update beta
+
+        result = torch.einsum('bij,bkj->bik', [input_, weight]) + bias.unsqueeze(1).expand(-1, input_.shape[1], -1)
         return result
 
     def analytic_update(self):
@@ -113,21 +142,46 @@ class R2D2Layer(nn.Module):
         analytically. The update equations are given in the paper in equation 9
         of the appendix: bayesiandeeplearning.org/2017/papers/42.pdf
         """
-        # TODO Update each of the parameters here using Gibbs sampling
         # Refer to Gibbs sampling algorithm for marginal R2D2 https://arxiv.org/pdf/1609.00046.pdf
 
         # Sample phi from InverseGaussian
-        self.psi = self.psi_.sample()
+        beta = self.beta_.mean.detach()
+        beta_sigma = self.beta_.std_dev.detach()
 
-        # Sample omega
-        chi = torch.sum(2 * self.beta / (self.beta_sigma ** 2 * self.phi * self.psi))
-        r = 2 * self.xi
-        lamb_0 = self.prior_xi_shape - self.out_features / 2
-        omega = self.omega_.sample()  # TODO: Create a GIG from this
+        self.psi_gib.update(
+            chi=torch.ones(1),
+            rho=beta ** 2 / (beta_sigma ** 2 * self.phi * self.omega / 2),
+            lamb=-1 / 2 * torch.ones(1)
+        )
+        self.psi = self.psi_gib.sample().squeeze(0) ** -1
+        self.psi[self.psi == 0] += 1e-8  # Ensure non-zero
 
-        # Sample xi from gamma
+        # Update omega distribution and Sample omega
+        self.omega_gib.update(
+            chi=torch.sum(2 * beta ** 2 / (beta_sigma ** 2 * self.phi * self.psi)),
+            rho=2 * self.xi,
+            lamb=(self.a_pi - 1 / 2) * self.tot_dim
+        )
+        self.omega = self.omega_gib.sample()
+
+        # Update full posterior of xi and sample xi
+        self.xi_gib.update(self.a_pi * self.tot_dim + self.prior_xi_shape, 1 + self.omega)
+        self.xi = self.xi_gib.sample().squeeze()
 
         # Sample phi
+        self.t_gib.update(
+            chi=2 * beta ** 2 / (beta_sigma ** 2 * self.psi),
+            rho=2 * self.xi,
+            lamb=self.a_pi - 1 / 2
+        )
+        t = self.t_gib.sample()
+        self.phi = t / torch.sum(t)
+        self.phi[self.phi == 0] += 1e-8
 
-        # TODO: Update the distributions of shrinkage parameters???
-        # TODO: Priors and gibbs marginal posterior, which one to take?
+    def kl_loss(self):
+        beta_sigma = self.beta_.std_dev.detach()
+        bias_sigma = self.bias.std_dev.detach()
+        kl = calculate_kl(self.prior_mu, self.prior_beta_sigma, self.beta, beta_sigma)
+        kl += calculate_kl(self.prior_mu, self.prior_bias_sigma, self.bias_mean, bias_sigma)
+        return kl
+

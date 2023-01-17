@@ -1,0 +1,37 @@
+#### general settings
+name: BPN
+train_type: cnn
+eval_type: cnn
+gpu_ids: [2]
+
+
+#### datasets
+dataset:
+  name: "CIFAR10"
+  image_size: 32
+  train_path: None
+
+#### Checkpoint settings
+checkpoints:
+  path: "./checkpoints/LeNet_CIFAR10/"
+  save_checkpoint_freq: 2
+
+
+#### Optimizer settings
+optimizer:
+  opt_method: "ADAM"
+  lr: 0.005  # Learning rate
+  weight_decay: 0.001
+
+#### training settings: learning rate scheme, loss, optimizer
+train:
+  model_name: "LeNet"
+
+  num_epochs: 1000
+  batch_size: 128
+  train_size: 1
+
+  in_channels: 3
+  out_channels: 10
+
+  loss: "CE"

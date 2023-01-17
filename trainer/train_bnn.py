@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torch.nn import functional as F
 
 from .trainer import Trainer
-from data import MVTecDataset
+from data import load_data
 import utils
 
 from parse import (
@@ -25,38 +25,11 @@ import torch
 class BNNTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
-        if self.config_data["name"] == "MNIST":
-            transform_mnist = transforms.Compose([
-                transforms.Resize((32, 32)),
-                transforms.ToTensor(),
-            ])
-            training_data = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform_mnist)
-            self.dataloader = DataLoader(training_data, batch_size=self.batch_size, shuffle=True)
-            testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform_mnist)
-            self.valid_loader = DataLoader(testset, batch_size=self.batch_size, num_workers=4)
-        elif self.config_data["name"] == "CIFAR10":
-            transform_cifar = transforms.Compose([
-                transforms.Resize((32, 32)),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-            ])
-            training_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_cifar)
-            self.dataloader = DataLoader(training_data, batch_size=self.batch_size, shuffle=True)
-            testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_cifar)
-            self.valid_loader = DataLoader(testset, batch_size=self.batch_size, num_workers=4)
-        elif self.config_data["name"] == "CIFAR100":
-            transform_cifar = transforms.Compose([
-                transforms.Resize((32, 32)),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-            ])
-            training_data = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_cifar)
-            self.dataloader = DataLoader(training_data, batch_size=self.batch_size, shuffle=True)
-            testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_cifar)
-            self.valid_loader = DataLoader(testset, batch_size=self.batch_size, num_workers=4)
+
+        self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size)
 
         self.model = parse_bayesian_model(self.config_train).to(self.device)
-        self.optimzer = parse_optimizer(self.config_optim, self.model.priors())
+        self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
         self.loss_fcn = parse_loss(self.config_train)
 
@@ -70,7 +43,8 @@ class BNNTrainer(Trainer):
 
         outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
 
-        pred, kl_loss = self.model(data)
+        pred = self.model(data)
+        kl_loss = self.model.kl_loss()
 
         outputs[:, :, 0] = F.log_softmax(pred, dim=1)
         log_outputs = utils.logmeanexp(outputs, dim=2)
@@ -89,7 +63,8 @@ class BNNTrainer(Trainer):
 
         outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
 
-        pred, kl_loss = self.model(data)
+        pred = self.model(data)
+        kl_loss = self.model.kl_loss()
 
         outputs[:, :, 0] = F.log_softmax(pred, dim=1)
 
@@ -107,6 +82,7 @@ class BNNTrainer(Trainer):
         valid_nll_list = []
         valid_acc_list = []
         probs = []
+        preds = []
         labels = []
 
         for i, (data, label) in enumerate(self.valid_loader):
@@ -116,6 +92,7 @@ class BNNTrainer(Trainer):
             res, kl, nll, acc, log_outputs, label = self.valid_one_step(data, label, beta)
 
             probs.append(log_outputs.softmax(1).detach().cpu().numpy())
+            preds.append(log_outputs.detach().cpu().numpy().argmax(axis=1))
             labels.append(label.detach().cpu().numpy())
 
             valid_loss_list.append(res)
@@ -125,6 +102,7 @@ class BNNTrainer(Trainer):
 
         valid_loss, valid_acc, valid_kl, valid_nll = np.mean(valid_loss_list), np.mean(valid_acc_list), np.mean(valid_kl_list), np.mean(valid_nll_list)
         probs = np.concatenate(probs)
+        preds = np.concatenate(preds)
         labels = np.concatenate(labels)
         precision, recall, f1, aucroc = utils.metrics(probs, labels, average="weighted")
 

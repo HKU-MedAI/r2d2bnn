@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader
 from torch.nn import functional as F
 
 from .trainer import Trainer
-from data import MVTecDataset
 import utils
+from data import load_data
 
 from parse import (
     parse_loss,
@@ -22,41 +22,19 @@ import torchvision
 import torch
 
 
-class BNNTrainer(Trainer):
+class R2D2BNNTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
-        if self.config_data["name"] == "MNIST":
-            transform_mnist = transforms.Compose([
-                transforms.Resize((32, 32)),
-                transforms.ToTensor(),
-            ])
-            training_data = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform_mnist)
-            self.dataloader = DataLoader(training_data, batch_size=self.batch_size, shuffle=True)
-            testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform_mnist)
-            self.valid_loader = DataLoader(testset, batch_size=self.batch_size, num_workers=4)
-        elif self.config_data["name"] == "CIFAR10":
-            transform_cifar = transforms.Compose([
-                transforms.Resize((32, 32)),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-            ])
-            training_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_cifar)
-            self.dataloader = DataLoader(training_data, batch_size=self.batch_size, shuffle=True)
-            testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_cifar)
-            self.valid_loader = DataLoader(testset, batch_size=self.batch_size, num_workers=4)
-        elif self.config_data["name"] == "CIFAR100":
-            transform_cifar = transforms.Compose([
-                transforms.Resize((32, 32)),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-            ])
-            training_data = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_cifar)
-            self.dataloader = DataLoader(training_data, batch_size=self.batch_size, shuffle=True)
-            testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_cifar)
-            self.valid_loader = DataLoader(testset, batch_size=self.batch_size, num_workers=4)
 
-        self.model = parse_bayesian_model(self.config_train).to(self.device)
-        self.optimzer = parse_optimizer(self.config_optim, self.model.priors())
+        self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size)
+
+        self.model = parse_bayesian_model(self.config_train)
+        # Load state dict if any
+        if self.checkpoint_manager.version > 0:
+            sd = self.checkpoint_manager.load_model()
+            self.model.load_state_dict(sd)
+
+        self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
         self.loss_fcn = parse_loss(self.config_train)
 
@@ -65,53 +43,65 @@ class BNNTrainer(Trainer):
         # introduces other beta computations
         self.beta = self.config_train["beta"]
 
-    def train_one_step(self, data, label, beta):
+    def train_one_step(self, data, label):
         self.optimzer.zero_grad()
 
         outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
 
-        pred, kl_loss = self.model(data)
+        pred = self.model(data)
+        pred = pred.mean(0)  # Taking the mean over sample dimensions
 
         # outputs[:, :, 0] = F.log_softmax(pred, dim=1)
         # log_outputs = utils.logmeanexp(outputs, dim=2)
-        log_outputs = F.log_softmax(pred, dim=1)
+        out = F.normalize(pred, 1)  # Temporary solutions normalizing the graidents
+        kl_loss = self.model.kl_loss()
+        ce_loss = F.cross_entropy(out, label, reduction='mean')
 
-        loss, nll_loss, kl_loss = self.loss_fcn(log_outputs, label, kl_loss, beta)
+        loss = ce_loss + kl_loss.item() * self.beta
+        # loss = ce_loss
         loss.backward()
 
         self.optimzer.step()
 
-        acc = utils.acc(log_outputs.data, label)
+        self.model.analytic_update()
 
-        return loss.item(), kl_loss.item(), nll_loss.item(), acc
+        acc = utils.acc(pred.data, label)
+
+        return loss.item(), kl_loss.item(), ce_loss.item(), acc, out
 
     def valid_one_step(self, data, label, beta):
 
         outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
 
-        pred, kl_loss = self.model(data)
+        pred = self.model(data)
+        pred = pred.mean(0)
 
         outputs[:, :, 0] = F.log_softmax(pred, dim=1)
 
         log_outputs = utils.logmeanexp(outputs, dim=2)
-
+        kl_loss = self.model.kl_loss()
         loss, nll_loss, kl_loss = self.loss_fcn(log_outputs, label, kl_loss, beta)
 
         acc = utils.acc(log_outputs.data, label)
 
-        return loss.item(), kl_loss.item(), nll_loss.item(), acc
+        return loss.item(), kl_loss.item(), nll_loss.item(), acc, log_outputs
 
     def validate(self, epoch):
         valid_loss_list = []
         valid_kl_list = []
         valid_nll_list = []
         valid_acc_list = []
+        probs = []
+        labels = []
 
         for i, (data, label) in enumerate(self.valid_loader):
-            (data, label) = (data.to(self.device), label.to(self.device))
+            label = label.to(self.device)
             # beta = utils.get_beta(i - 1, len(self.valid_loader), "Standard", epoch, self.n_epoch)
             beta = self.beta
-            res, kl, nll, acc = self.valid_one_step(data, label, beta)
+            res, kl, nll, acc, log_outputs = self.valid_one_step(data, label, beta)
+
+            probs.append(log_outputs.softmax(1).detach().cpu().numpy())
+            labels.append(label.detach().cpu().numpy())
 
             valid_loss_list.append(res)
             valid_kl_list.append(kl)
@@ -119,35 +109,45 @@ class BNNTrainer(Trainer):
             valid_acc_list.append(acc)
 
         valid_loss, valid_acc, valid_kl, valid_nll = np.mean(valid_loss_list), np.mean(valid_acc_list), np.mean(valid_kl_list), np.mean(valid_nll_list)
+        probs = np.concatenate(probs)
+        labels = np.concatenate(labels)
+        precision, recall, f1, aucroc = utils.metrics(probs, labels, average="weighted")
 
-        return valid_loss, valid_acc, valid_kl, valid_nll
+        return valid_loss, valid_acc, valid_kl, valid_nll, precision, recall, f1, aucroc
 
     def train(self) -> None:
         print(f"Start training BNN...")
 
-        training_range = tqdm(range(self.n_epoch))
+        training_range = tqdm(range(self.starting_epoch, self.n_epoch))
         for epoch in training_range:
             training_loss_list = []
             kl_list = []
             nll_list = []
             acc_list = []
+            probs = []
+            labels = []
 
-            beta = self.beta
+            for i, (data, label) in tqdm(enumerate(self.dataloader)):
+                label = label.to(self.device)
 
-            for i, (data, label) in enumerate(self.dataloader):
-                (data, label) = (data.to(self.device), label.to(self.device))
-
-                res, kl, nll, acc = self.train_one_step(data, label, beta)
+                res, kl, nll, acc, log_outputs = self.train_one_step(data, label)
 
                 training_loss_list.append(res)
                 kl_list.append(kl)
                 nll_list.append(nll)
                 acc_list.append(acc)
 
+                probs.append(log_outputs.softmax(1).detach().cpu().numpy())
+                labels.append(label.detach().cpu().numpy())
+
             train_loss, train_acc, train_kl, train_nll = np.mean(training_loss_list), np.mean(acc_list), np.mean(
                 kl_list), np.mean(nll_list)
 
-            valid_loss, valid_acc, valid_kl, valid_nll = self.validate(epoch)
+            probs = np.concatenate(probs)
+            labels = np.concatenate(labels)
+            train_precision, train_recall, train_f1, train_aucroc = utils.metrics(probs, labels, average="weighted")
+
+            valid_loss, valid_acc, valid_kl, valid_nll, val_precision, val_recall, val_f1, val_aucroc = self.validate(epoch)
 
             training_range.set_description('Epoch: {} \tTraining Loss: {:.4f} \tTraining Accuracy: {:.4f} \tValidation Loss: {:.4f} \tValidation Accuracy: {:.4f} \tTrain_kl_div: {:.4f} \tTrain_nll: {:.4f}'.format(
                     epoch, train_loss, train_acc, valid_loss, valid_acc, train_kl, train_nll))
@@ -160,9 +160,13 @@ class BNNTrainer(Trainer):
                     "Train NLL Loss": train_nll,
                     "Train KL Loss": train_kl,
                     "Train Accuracy": train_acc,
+                    "Train F1": train_f1,
+                    "Train AUC": train_aucroc,
                     "Validation Loss": valid_loss,
                     "Validation KL Loss": valid_kl,
                     "Validation Accuracy": valid_acc,
+                    "Validation F1": val_f1,
+                    "Validation AUC": val_aucroc
                 }
 
                 # State dict of the model including embeddings

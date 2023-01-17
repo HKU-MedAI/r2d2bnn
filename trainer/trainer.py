@@ -20,6 +20,7 @@ class Trainer(ABC):
 
         # Load number of epochs
         self.n_epoch = self.config_train['num_epochs']
+        self.starting_epoch = self.checkpoint_manager.version
 
         # Read batch size
         self.batch_size = self.config_train['batch_size']

@@ -1,6 +1,6 @@
 #### general settings
 name: BPN
-train_type: bnn-horseshoe
+train_type: bnn-r2d2
 eval_type: bnn
 gpu_ids: [2]
 
@@ -13,29 +13,33 @@ dataset:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/BLeNet_CIFAR10/"
-  save_checkpoint_freq: 5
+  path: "./checkpoints/R2D2LeNet_CIFAR10/"
+  save_checkpoint_freq: 2
 
 
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.005  # Learning rate
+  lr: 0.001  # Learning rate
   weight_decay: 0.001
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
-  model_name: "BLeNet"
+  model_name: "R2D2LeNet"
 
-  num_epochs: 1000
-  batch_size: 128
+  num_epochs: 2000
+  batch_size: 1024
   train_size: 1
 
   beta: 0.001
-  prior_mu: 0
-  prior_sigma: 0.01
-  posterior_mu_initial: [0, 0.01]
-  posterior_rho_initial: [-2, 0.01]
+
+  r2d2_scale:
+  prior_phi_prob: 0.6
+  prior_psi_shape: 0.5
+  beta_rho_scale: [-2.5, 0.05]
+  bias_rho_scale: [-2.5, 0.05]
+  weight_xi_shape: 0.3
+  weight_omega_shape: 0.5
 
   in_channels: 3
   out_channels: 10

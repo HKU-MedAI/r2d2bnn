@@ -5,7 +5,6 @@ from torch import nn
 from torch.nn import Module, Parameter
 import torch.nn.functional as F
 
-from .module_wrapper import ModuleWrapper
 from losses import calculate_kl
 
 

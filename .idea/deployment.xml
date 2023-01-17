@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="r11user1@research11.saas.hku.hk:22 password (2)" remoteFilesAllowedToDisappearOnAutoupload="false" showNewOnTargetInSync="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="r11user1@research11.saas.hku.hk:22 password" remoteFilesAllowedToDisappearOnAutoupload="false" showNewOnTargetInSync="false">
     <serverData>
       <paths name="howardchan@10.101.100.24:2212 key">
         <serverdata>
@@ -40,7 +40,7 @@
       <paths name="r11user1@research11.saas.hku.hk:22 password">
         <serverdata>
           <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/r11user1/r2d2bnn" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
