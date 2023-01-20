@@ -98,6 +98,9 @@ class HorseshoeConvLayer(nn.Module):
         self.log_v_rho = nn.Parameter(torch.ones([1, *self.kernel_size]) * priors["log_v_rho_scale"])
         self.log_v = ReparametrizedGaussian(self.log_v_mean, self.log_v_rho)
 
+    def kl_loss(self):
+        return self.log_variational_posterior() - self.log_prior()
+
     def log_prior(self):
         """
         Computes the expectation of the log of the prior p under the variational posterior q

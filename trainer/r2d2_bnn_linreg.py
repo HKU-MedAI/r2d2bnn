@@ -1,5 +1,5 @@
 """
-Trainer of BNN
+Trainer of R2D2 BNN Linear Regression
 """
 from tqdm import tqdm
 
@@ -22,13 +22,13 @@ import torchvision
 import torch
 
 
-class BLinearRegTrainer(Trainer):
+class R2D2LinearRegTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
 
         self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size)
 
-        self.model = parse_bayesian_model(self.config_train).to(self.device)
+        self.model = parse_bayesian_model(self.config_train)
         self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
         self.loss_fcn = parse_loss(self.config_train)
@@ -41,12 +41,12 @@ class BLinearRegTrainer(Trainer):
     def train_one_step(self, data, label):
         self.optimzer.zero_grad()
 
-        outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
         pred = self.model(data)
+        pred = pred.mean(0)
         kl_loss = self.model.kl_loss()
 
         mse_loss = ((pred.squeeze() - label) ** 2).mean()
-        loss = mse_loss + kl_loss * self.beta
+        loss = mse_loss + kl_loss.item() * self.beta
 
         loss.backward()
 
@@ -56,38 +56,45 @@ class BLinearRegTrainer(Trainer):
 
     def valid_one_step(self, data, label):
 
+        outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
+
         pred = self.model(data)
+        pred = pred.mean(0)
+        pred_var = pred.var(0)
         kl_loss = self.model.kl_loss()
 
         mse_loss = ((pred.squeeze() - label) ** 2).mean()
 
-        loss = mse_loss + kl_loss * self.beta
+        loss = mse_loss + kl_loss.item() * self.beta
 
         loss.backward()
 
-        return loss.item(), mse_loss.item(), kl_loss.item(), label, pred
+        return loss.item(), mse_loss.item(), kl_loss.item(), label, pred, pred_var
 
     def validate(self, epoch):
         valid_loss_list = []
         valid_kl_list = []
         valid_mse_list = []
+        valid_var_list = []
         preds = []
         labels = []
 
         for i, (data, label) in enumerate(self.valid_loader):
-            (data, label) = (data.to(self.device), label.to(self.device))
+            # (data, label) = (data.to(self.device), label.to(self.device))
+            label = label.to(self.device)
             # beta = utils.get_beta(i - 1, len(self.valid_loader), "Standard", epoch, self.n_epoch)
-            res, mse, kl, label, pred = self.valid_one_step(data, label)
+            res, mse, kl, label, pred, pred_var = self.valid_one_step(data, label)
 
             labels.append(label.detach().cpu().numpy())
-            preds.append(pred.detach().cpu().numpy())
+            preds.append(pred.mean(0).squeeze().detach().cpu().numpy())
+            valid_var_list.append(pred_var.detach().cpu().numpy())
 
             valid_loss_list.append(res)
             valid_mse_list.append(mse)
             valid_kl_list.append(kl)
 
         valid_loss, valid_kl, valid_mse = np.mean(valid_loss_list), np.mean(valid_kl_list), np.mean(valid_mse_list)
-        valid_var = float(np.var(np.concatenate(preds)))
+        valid_var = float(np.mean(valid_var_list))
 
         return valid_loss, valid_kl, valid_mse, valid_var
 
@@ -100,10 +107,9 @@ class BLinearRegTrainer(Trainer):
             mse_list = []
             kl_list = []
 
-            beta = self.beta
-
             for i, (data, label) in enumerate(self.dataloader):
-                (data, label) = (data.to(self.device), label.to(self.device))
+                # (data, label) = (data.to(self.device), label.to(self.device))
+                label = label.to(self.device)
 
                 res, mse, kl, label = self.train_one_step(data, label)
 

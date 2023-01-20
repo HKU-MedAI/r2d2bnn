@@ -9,6 +9,7 @@ from .train_MCdropout import CNNMCDropoutTrainer
 from .train_bnn_linreg import BLinearRegTrainer
 from .train_horseshoe_bnn import BNNHorseshoeTrainer
 from .train_r2d2_bnn import R2D2BNNTrainer
+from .r2d2_bnn_linreg import R2D2LinearRegTrainer
 from .uncertainty_bnn import BNNUncertaintyTrainer
 
 __all__ = [

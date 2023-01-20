@@ -52,10 +52,10 @@ class R2D2BNNTrainer(Trainer):
         pred = pred.mean(0)  # Taking the mean over sample dimensions
 
         # outputs[:, :, 0] = F.log_softmax(pred, dim=1)
-        # log_outputs = utils.logmeanexp(outputs, dim=2)
-        out = F.normalize(pred, 1)  # Temporary solutions normalizing the graidents
+        # pred = utils.logmeanexp(outputs, dim=2)
+        pred = F.normalize(pred, 1)  # Temporary solutions normalizing the graidents
         kl_loss = self.model.kl_loss()
-        ce_loss = F.cross_entropy(out, label, reduction='mean')
+        ce_loss = F.cross_entropy(pred, label, reduction='mean')
 
         loss = ce_loss + kl_loss.item() * self.beta
         # loss = ce_loss
@@ -67,7 +67,7 @@ class R2D2BNNTrainer(Trainer):
 
         acc = utils.acc(pred.data, label)
 
-        return loss.item(), kl_loss.item(), ce_loss.item(), acc, out
+        return loss.item(), kl_loss.item(), ce_loss.item(), acc, pred
 
     def valid_one_step(self, data, label, beta):
 
@@ -76,15 +76,16 @@ class R2D2BNNTrainer(Trainer):
         pred = self.model(data)
         pred = pred.mean(0)
 
-        outputs[:, :, 0] = F.log_softmax(pred, dim=1)
-
-        log_outputs = utils.logmeanexp(outputs, dim=2)
+        # outputs[:, :, 0] = F.log_softmax(pred, dim=1)
+        #
+        # log_outputs = utils.logmeanexp(outputs, dim=2)
+        pred = F.normalize(pred, 1)
         kl_loss = self.model.kl_loss()
-        loss, nll_loss, kl_loss = self.loss_fcn(log_outputs, label, kl_loss, beta)
+        loss, nll_loss, kl_loss = self.loss_fcn(pred, label, kl_loss, beta)
 
-        acc = utils.acc(log_outputs.data, label)
+        acc = utils.acc(pred.data, label)
 
-        return loss.item(), kl_loss.item(), nll_loss.item(), acc, log_outputs
+        return loss.item(), kl_loss.item(), nll_loss.item(), acc, pred
 
     def validate(self, epoch):
         valid_loss_list = []

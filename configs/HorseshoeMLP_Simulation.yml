@@ -1,7 +1,7 @@
 #### general settings
 name: BPN
-train_type: bnn-linreg
-eval_type: bn
+train_type: r2d2-linreg
+eval_type: bnn
 gpu_ids: [2]
 
 
@@ -12,7 +12,7 @@ dataset:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/BMLP_L0/"
+  path: "./checkpoints/HorseshoeMLP_L1/"
   save_checkpoint_freq: 5
 
 
@@ -24,18 +24,24 @@ optimizer:
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
-  model_name: "BMLP"
+  model_name: "HorseshoeMLP"
 
   num_epochs: 100
   batch_size: 1024
   train_size: 1
-  n_blocks: 0
+  n_blocks: 1
 
-  beta: 0.001
-  prior_mu: 0
-  prior_sigma: 0.01
-  posterior_mu_initial: [0, 0.01]
-  posterior_rho_initial: [-3, 0.01]
+  beta: 0.0001
+
+  horseshoe_scale:
+  global_cauchy_scale: 1.
+  weight_cauchy_scale: 1.
+  beta_rho_scale: -5.
+  log_tau_mean:
+  log_tau_rho_scale: -5.
+  bias_rho_scale: -5.
+  log_v_mean:
+  log_v_rho_scale: -5.
 
   in_channels: 4
   out_channels: 1

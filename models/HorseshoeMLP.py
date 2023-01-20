@@ -1,18 +1,18 @@
 import torch.nn as nn
 
 from layers import (
-    R2D2LinearLayer
+    HorseshoeLinearLayer
 )
 
 
-class R2D2MultipleLinear(nn.Module):
+class HorseshoeMultipleLinear(nn.Module):
     """
     Simple Neural Network having 3 Convolution
     and 3 FC layers with Bayesian layers.
     """
 
     def __init__(self, outputs, inputs, priors, n_blocks=3, layer_type="r2d2", activation_type='softplus'):
-        super(R2D2MultipleLinear, self).__init__()
+        super(HorseshoeMultipleLinear, self).__init__()
 
         self.num_classes = outputs
         self.priors = priors
@@ -27,10 +27,10 @@ class R2D2MultipleLinear(nn.Module):
         self.n_blocks = n_blocks
 
         linears = [
-                R2D2LinearLayer(inputs, 32, self.priors),
-                R2D2LinearLayer(32, 64, self.priors),
-                R2D2LinearLayer(64, 128, self.priors),
-                R2D2LinearLayer(128, 128, self.priors)
+            HorseshoeLinearLayer(inputs, 32, self.priors),
+            HorseshoeLinearLayer(32, 64, self.priors),
+            HorseshoeLinearLayer(64, 128, self.priors),
+            HorseshoeLinearLayer(128, 128, self.priors)
         ]
 
         out_channel = inputs
@@ -42,7 +42,7 @@ class R2D2MultipleLinear(nn.Module):
             self.dense_block.add_module(f"act{l}", self.act())
             out_channel = linears[l].out_features
 
-        fc_out = R2D2LinearLayer(out_channel, outputs, self.priors)
+        fc_out = HorseshoeLinearLayer(out_channel, outputs, self.priors)
         self.dense_block.add_module(f"fc_out", fc_out)
 
     def kl_loss(self):

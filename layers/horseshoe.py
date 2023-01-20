@@ -201,6 +201,9 @@ class HorseshoeLinearLayer(nn.Module):
 
         return -entropy
 
+    def kl_loss(self):
+        return self.log_variational_posterior() - self.log_prior()
+
     def forward(self, input_, sample=True, n_samples=1):
         """
         Performs a forward pass through the layer, that is, computes

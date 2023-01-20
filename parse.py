@@ -9,10 +9,12 @@ from models import (
     BBBHorseshoeAlexNet,
     BBBResNet,
     BBBHorseshoeCNN,
+    HorseshoeMultipleLinear,
     BBBHorseshoeLeNet,
     BBBR2D2LeNet,
     BBBR2D2AlexNet,
     BBBR2D2CNN,
+    R2D2MultipleLinear,
     ResNet,
     CNN,
 )
@@ -93,7 +95,7 @@ def parse_bayesian_model(config_train, image_size=32):
             'posterior_mu_initial': config_train["posterior_mu_initial"],
             'posterior_rho_initial': config_train["posterior_rho_initial"],
         }
-    elif model_name in ["HorseshoeLeNet", "BHorseshoeAlexNet", "HorseshoeCNN"]:
+    elif model_name in ["HorseshoeLeNet", "BHorseshoeAlexNet", "HorseshoeCNN", "HorseshoeMLP"]:
         priors = {
             "horseshoe_scale": config_train["horseshoe_scale"],
             "global_cauchy_scale": config_train["global_cauchy_scale"],
@@ -105,7 +107,7 @@ def parse_bayesian_model(config_train, image_size=32):
             "log_v_mean": config_train["log_v_mean"],
             "log_v_rho_scale": config_train["log_v_rho_scale"]
         }
-    elif model_name in ["R2D2AlexNet", "R2D2LeNet", "R2D2CNN"]:
+    elif model_name in ["R2D2AlexNet", "R2D2LeNet", "R2D2CNN", "R2D2MLP"]:
         priors = {
             "r2d2_scale": config_train["r2d2_scale"],
             "prior_phi_prob": config_train["prior_phi_prob"],
@@ -155,6 +157,14 @@ def parse_bayesian_model(config_train, image_size=32):
             priors=priors,
             n_blocks=n_blocks
         )
+    elif model_name == "HorseshoeMLP":
+        n_blocks = config_train["n_blocks"]
+        return HorseshoeMultipleLinear(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            n_blocks=n_blocks
+        )
     elif model_name == "R2D2CNN":
         n_blocks = config_train["n_blocks"]
         return BBBR2D2CNN(
@@ -175,6 +185,14 @@ def parse_bayesian_model(config_train, image_size=32):
             outputs=out_dim,
             inputs=in_dim,
             priors=priors
+        )
+    elif model_name == "R2D2MLP":
+        n_blocks = config_train["n_blocks"]
+        return R2D2MultipleLinear(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors,
+            n_blocks=n_blocks
         )
     elif model_name == "BAlexNet":
         model = BBBAlexNet(

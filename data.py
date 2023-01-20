@@ -66,7 +66,7 @@ class SimulatedDataset(Dataset):
         self.n = n
         x = np.random.normal(loc=mean, scale=sd, size=(4, n))
         self.covariates = x.T.astype('float32')
-        self.y = (1 / 4 * np.sin(x[0]) + x[1] + x[2] ** 3 + 1 / x[3]).astype('float32')
+        self.y = (2 * np.sin(x[0]) + x[1] + x[2] ** 2 + np.cos(x[3])).astype('float32')
 
     def __len__(self):
         return self.covariates.shape[0]

@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch.nn import functional as F
 from layers import (
     FlattenLayer
 )
@@ -59,6 +60,40 @@ class AlexNet(nn.Module):
         x = self.conv5(x)
         x = self.act5(x)
         x = self.pool3(x)
+
+        x = self.flatten(x)
+        x = self.fc(x)
+
+        return x
+
+    def mc_dropout(self, x, p):
+        x = self.conv1(x)
+        x = self.act1(x)
+        x = self.pool1(x)
+
+        x = F.dropout(x, p)
+
+        x = self.conv2(x)
+        x = self.act2(x)
+        x = self.pool2(x)
+
+        x = F.dropout(x, p)
+
+        x = self.conv3(x)
+        x = self.act3(x)
+
+        x = F.dropout(x, p)
+
+        x = self.conv4(x)
+        x = self.act4(x)
+
+        x = F.dropout(x, p)
+
+        x = self.conv5(x)
+        x = self.act5(x)
+        x = self.pool3(x)
+
+        x = F.dropout(x, p)
 
         x = self.flatten(x)
         x = self.fc(x)

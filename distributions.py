@@ -77,7 +77,7 @@ def gigrnd(p, a, b):
     s[cond1] = torch.log(
         1.0 + 1.0 / alpha[cond1] +
         torch.sqrt(1.0 / alpha[cond1] ** 2 +
-                  2.0 / alpha[cond1])
+                   2.0 / alpha[cond1])
     )
     s[cond2] = 1 / lam[cond2]
     s[cond3] = torch.minimum(
@@ -137,7 +137,6 @@ def gigrnd(p, a, b):
 
 
 def gigrnd2(p, a, b):
-
     def psi(x, alpha, lam):
         # f = -alpha*(math.cosh(x)-1.0)-lam*(math.exp(x)-x-1.0)
         f = - alpha * (np.cosh(x) - 1) - lam * (np.exp(x) - x - 1)
@@ -206,7 +205,7 @@ def gigrnd2(p, a, b):
     s[cond1] = np.log(
         1.0 + 1.0 / alpha[cond1] +
         np.sqrt(1.0 / alpha[cond1] ** 2 +
-                   2.0 / alpha[cond1])
+                2.0 / alpha[cond1])
     )
     s[cond2] = 1 / lam[cond2]
     s[cond3] = np.minimum(
@@ -238,7 +237,7 @@ def gigrnd2(p, a, b):
         U = np.random.uniform(size=p.shape)
         V = np.random.uniform(size=p.shape)
         W = np.random.uniform(size=p.shape)
-        rnd = np.zeros(p.shape)
+        rnd = np.ones(p.shape)
 
         cond1 = U < q / (p + q + r)
         cond2 = (U >= q / (p + q + r)) & (U < (q + r) / (p + q + r))

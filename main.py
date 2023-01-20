@@ -12,6 +12,7 @@ from trainer import (
     BLinearRegTrainer,
     BNNHorseshoeTrainer,
     R2D2BNNTrainer,
+    R2D2LinearRegTrainer,
     BNNUncertaintyTrainer
 )
 from utils import ordered_yaml
@@ -23,7 +24,7 @@ parser.add_argument('-seed', type=int, help='random seed of the run', default=61
 args = parser.parse_args()
 
 opt_path = args.config
-default_config_path = "CNN_CIFAR10.yml"
+default_config_path = "BMLP_Simulation.yml"
 
 if opt_path == "":
     opt_path = CONFIG_DIR / default_config_path
@@ -59,6 +60,8 @@ def main():
             trainer = R2D2BNNTrainer(config)
         elif config["train_type"] == "bnn-linreg":
             trainer = BLinearRegTrainer(config)
+        elif config["train_type"] == "r2d2-linreg":
+            trainer = R2D2LinearRegTrainer(config)
         elif config["train_type"] == "bnn-uncertainty":
             trainer = BNNUncertaintyTrainer(config)
         else:

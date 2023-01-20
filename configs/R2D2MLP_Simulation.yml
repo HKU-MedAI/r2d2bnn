@@ -1,48 +1,47 @@
 #### general settings
 name: BPN
-train_type: bnn-r2d2
+train_type: r2d2-linreg
 eval_type: bnn
 gpu_ids: [2]
 
 
 #### datasets
 dataset:
-  name: "CIFAR10"
-  image_size: 32
-  train_path: None
+  name: "simulated"
+  n: 10000
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2CNN_L4_CIFAR10/"
-  save_checkpoint_freq: 2
+  path: "./checkpoints/R2D2MLP_L3/"
+  save_checkpoint_freq: 5
 
 
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.0005  # Learning rate
-  weight_decay: 0
+  lr: 0.005  # Learning rate
+  weight_decay: 0.001
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
-  model_name: "R2D2CNN"
+  model_name: "R2D2MLP"
 
-  num_epochs: 2000
+  num_epochs: 100
   batch_size: 1024
   train_size: 1
-  n_blocks: 4
+  n_blocks: 3
 
   beta: 0.0001
 
   r2d2_scale:
   prior_phi_prob: 0.6
   prior_psi_shape: 0.5
-  beta_rho_scale: [-3, 0.05]
-  bias_rho_scale: [-3, 0.05]
+  beta_rho_scale: [-4, 0.05]
+  bias_rho_scale: [-4, 0.05]
   weight_xi_shape: 0.3
   weight_omega_shape: 0.5
 
-  in_channels: 3
-  out_channels: 10
+  in_channels: 4
+  out_channels: 1
 
   loss: "ELBO"

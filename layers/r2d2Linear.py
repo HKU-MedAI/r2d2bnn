@@ -61,13 +61,19 @@ class R2D2LinearLayer(nn.Module):
         self.prior_xi_rate = torch.Tensor([1])
         self.xi_ = Gamma(self.prior_xi_shape, self.prior_xi_rate)
 
+        # Register parameters - parameters updated analytically do not require grads
+        self.xi = nn.Parameter(torch.zeros(1), requires_grad=False)
+        self.psi = nn.Parameter(torch.zeros(out_features, in_features), requires_grad=False)
+        self.phi = nn.Parameter(torch.zeros(out_features, in_features), requires_grad=False)
+        self.omega = nn.Parameter(torch.zeros(1), requires_grad=False)
+
         # Distribution of Omega
         self.prior_omega_rate = torch.Tensor([parameters["weight_omega_shape"]])
-        self.xi = self.xi_.sample().squeeze()
+        self.xi.data = self.xi_.sample().squeeze()
         self.omega_ = Gamma(self.tot_dim * self.a_pi, self.xi)
-        self.psi = self.psi_.sample()
-        self.phi = self.phi_.sample()
-        self.omega = self.omega_.sample().squeeze()
+        self.psi.data = self.psi_.sample()
+        self.phi.data = self.phi_.sample()
+        self.omega.data = self.omega_.sample().squeeze()
         self.beta = self.beta_.sample()
 
         # Initialization of distributions for Gibbs sampling
@@ -78,14 +84,14 @@ class R2D2LinearLayer(nn.Module):
             lamb=(self.a_pi - 1 / 2) * self.tot_dim
         )
         self.t_gib = GeneralizedInvGaussian(
-            chi=2 * self.beta ** 2 / (self.beta_.std_dev ** 2 * self.phi * self.psi),
+            chi=2 * self.beta ** 2 / (self.beta_.std_dev ** 2 * self.psi),
             rho=2 * self.xi,
             lamb=self.a_pi - 1 / 2
         )
         self.psi_gib = GeneralizedInvGaussian(
-            chi=-1 / 2 * torch.ones(1),
-            rho=1 / torch.sqrt(self.beta_.std_dev ** 2 + self.phi * self.omega / 2) / torch.abs(self.beta),
-            lamb=torch.ones(1)
+            chi=torch.ones(1),
+            rho=self.beta_mean ** 2 / (self.beta_.std_dev ** 2 * self.phi * self.omega / 2),
+            lamb=-1 / 2 * torch.ones(1)
         )
 
         # Define prior quantities for calculating the KL loss
@@ -104,7 +110,7 @@ class R2D2LinearLayer(nn.Module):
         self.bias_rho.data.normal_(*self.priors["bias_rho_scale"])
 
 
-    def forward(self, input_, sample=True, n_samples=10):
+    def forward(self, input_, sample=True, n_samples=20):
         """
         Performs a forward pass through the layer, that is, computes
         the layer output for a given input batch.
@@ -117,10 +123,14 @@ class R2D2LinearLayer(nn.Module):
         # Compute variance parameter
         # It is phi_j and psi_j for local shrinkage
         beta = self.beta_.sample(n_samples)
-        beta_eps = torch.empty(self.beta.size()).normal_(0, 1)
-        beta_sigma = torch.sqrt(self.beta_.std_dev ** 2 * self.omega * self.phi * self.psi / 2)
+        beta_sigma = self.beta_.std_dev.detach()
+        beta_eps = torch.empty(beta.size()).normal_(0, 1)
+        beta_std = torch.sqrt(beta_sigma ** 2 * self.omega * self.phi * self.psi / 2)
 
-        weight = beta + beta_sigma * beta_eps
+        if self.training:
+            weight = beta + beta_std * beta_eps
+        else:
+            weight = beta + beta_std
 
         bias = self.bias.sample(n_samples)
 
@@ -153,7 +163,7 @@ class R2D2LinearLayer(nn.Module):
             rho=beta ** 2 / (beta_sigma ** 2 * self.phi * self.omega / 2),
             lamb=-1 / 2 * torch.ones(1)
         )
-        self.psi = self.psi_gib.sample().squeeze(0) ** -1
+        self.psi.data = self.psi_gib.sample().squeeze(0) ** -1
         self.psi[self.psi == 0] += 1e-8  # Ensure non-zero
 
         # Update omega distribution and Sample omega
@@ -162,11 +172,11 @@ class R2D2LinearLayer(nn.Module):
             rho=2 * self.xi,
             lamb=(self.a_pi - 1 / 2) * self.tot_dim
         )
-        self.omega = self.omega_gib.sample()
+        self.omega.data = self.omega_gib.sample()
 
         # Update full posterior of xi and sample xi
         self.xi_gib.update(self.a_pi * self.tot_dim + self.prior_xi_shape, 1 + self.omega)
-        self.xi = self.xi_gib.sample().squeeze()
+        self.xi.data = self.xi_gib.sample().squeeze()
 
         # Sample phi
         self.t_gib.update(
@@ -175,13 +185,15 @@ class R2D2LinearLayer(nn.Module):
             lamb=self.a_pi - 1 / 2
         )
         t = self.t_gib.sample()
-        self.phi = t / torch.sum(t)
+        self.phi.data = t / torch.sum(t)
         self.phi[self.phi == 0] += 1e-8
 
     def kl_loss(self):
+        beta = self.beta_.mean.detach()
+        bias = self.bias.mean.detach()
         beta_sigma = self.beta_.std_dev.detach()
         bias_sigma = self.bias.std_dev.detach()
-        kl = calculate_kl(self.prior_mu, self.prior_beta_sigma, self.beta, beta_sigma)
-        kl += calculate_kl(self.prior_mu, self.prior_bias_sigma, self.bias_mean, bias_sigma)
+        kl = calculate_kl(self.prior_mu, self.prior_beta_sigma, beta, beta_sigma)
+        kl += calculate_kl(self.prior_mu, self.prior_bias_sigma, bias, bias_sigma)
         return kl
 

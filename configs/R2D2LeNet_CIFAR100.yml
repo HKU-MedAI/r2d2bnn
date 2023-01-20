@@ -31,7 +31,7 @@ train:
   batch_size: 1024
   train_size: 1
 
-  beta: 0.005
+  beta: 0.0001
 
   r2d2_scale:
   prior_phi_prob: 0.6
