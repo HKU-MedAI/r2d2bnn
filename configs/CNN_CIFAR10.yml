@@ -6,7 +6,7 @@ gpu_ids: [2]
 
 
 #### datasets
-dataset:
+data:
   name: "CIFAR10"
   image_size: 32
   train_path: None

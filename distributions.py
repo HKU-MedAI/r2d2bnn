@@ -173,7 +173,7 @@ def gigrnd2(p, a, b):
         p = p.expand(b.size())
 
     # Convert to numpy
-    p, a, b = p.numpy(), a.numpy(), b.numpy()
+    p, a, b = p.detach().numpy(), a.detach().numpy(), b.detach().numpy()
 
     # setup -- sample from the two-parameter version gig(lam,omega)
     lam = p
@@ -387,6 +387,8 @@ class ReparametrizedGaussian(Distribution):
             dim = 1
             for d in self.mean.shape:
                 dim *= d
+        elif self.mean.dim() == 0:
+            dim = 1
         else:
             dim = len(self.mean)
             # n_outputs = 1

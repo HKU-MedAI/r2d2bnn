@@ -40,7 +40,8 @@ def load_data(config_data, batch_size=32):
         valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
     elif config_data["name"] == "simulated":
         n = config_data["n"]
-        trainset, testset  = simulate(n)
+        scenario = config_data["scenario"]
+        trainset, testset = simulate(n, scenario)
 
         # Dataloaders
         train_dataloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
@@ -51,8 +52,8 @@ def load_data(config_data, batch_size=32):
     return train_dataloader, valid_loader
 
 
-def simulate(n):
-    dataset = SimulatedDataset(n)
+def simulate(n, scenario):
+    dataset = SimulatedDataset(n, scenario)
 
     train_size = int(0.8 * len(dataset))
     test_size = len(dataset) - train_size
@@ -62,11 +63,47 @@ def simulate(n):
 
 
 class SimulatedDataset(Dataset):
-    def __init__(self, n, mean=0, sd=1):
+    def __init__(self, n, scenario, mean=0, sd=1):
+        # Set random seed
+        np.random.seed(30)
         self.n = n
-        x = np.random.normal(loc=mean, scale=sd, size=(4, n))
+        if scenario == 1:  # Polynomial case
+            x = np.random.uniform(-5, 5, size=(1, n))
+            eps = np.random.normal(loc=mean, scale=3, size=n)
+            self.y = x[0] ** 3 + eps
+        elif scenario == 2:  # Linear Regression
+            x = np.random.uniform(-5, 5, size=(4, n))
+            self.y = x[0] + 1 /4 * x[1] + 2 * x[2] ** 2 + x[3]
+        elif scenario == 3:  # Non linear case
+            x = np.random.uniform(-5, 5, size=(4, n))
+            eps = np.random.normal(loc=mean, scale=3, size=n)
+            self.y = x[0] * (x[1] ** 2 + 1) + x[2] * x[3] + eps
+        elif scenario == 4:  # Sparse case
+            p = 200
+            x = np.random.uniform(-5, 5, size=(p, n))
+            eps = np.random.normal(loc=mean, scale=2, size=n)
+            beta_1 = np.zeros(p * 9 // 10)
+            beta_2 = np.random.uniform(0, 1, size=p // 10)
+            beta = np.concatenate([beta_1, beta_2])
+            beta = np.random.permutation(beta)
+            self.y = (np.einsum("ij, i -> j", x, beta) + eps)
+        elif scenario == 5:  # Dense case
+            p = 200
+            x = np.random.uniform(-5, 5, size=(p, n))
+            eps = np.random.normal(loc=mean, scale=2, size=n)
+            beta_1 = np.zeros(p // 10)
+            beta_2 = np.random.uniform(0, 1, size=p * 9 // 10)
+            beta = np.concatenate([beta_1, beta_2])
+            beta = np.random.permutation(beta)
+            self.y = (np.einsum("ij, i -> j", x, beta) + eps)
+        else:
+            raise NotImplementedError("This scenario is not implemented")
+
+        self.y = self.y.astype('float32')
+
+        assert x is not None
+
         self.covariates = x.T.astype('float32')
-        self.y = (2 * np.sin(x[0]) + x[1] + x[2] ** 2 + np.cos(x[3])).astype('float32')
 
     def __len__(self):
         return self.covariates.shape[0]

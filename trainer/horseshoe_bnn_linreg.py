@@ -22,7 +22,7 @@ import torchvision
 import torch
 
 
-class R2D2LinearRegTrainer(Trainer):
+class HorseshoeLinearRegTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
 
@@ -58,8 +58,9 @@ class R2D2LinearRegTrainer(Trainer):
 
     def valid_one_step(self, data, label):
 
-        pred = self.model(data)
-        pred_var = pred.squeeze().var(0)
+        preds = [self.model(data) for _ in range(100)]
+        pred = torch.stack(preds).squeeze()
+        pred_var = pred.var(0)
         kl_loss = self.model.kl_loss()
 
         mse_loss = ((pred.mean(0).squeeze() - label) ** 2).mean()

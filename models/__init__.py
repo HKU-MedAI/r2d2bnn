@@ -15,7 +15,7 @@ from .r2d2AlexNet import BBBR2D2AlexNet
 from .r2d2CNN import BBBR2D2CNN
 from .R2D2MLP import R2D2MultipleLinear
 from .BResNet import BBBResNet
-from .frequentists import EfficientNetB4, AlexNet, LeNet, ResNet, CNN
+from .frequentists import EfficientNetB4, AlexNet, LeNet, ResNet, CNN, MultipleLinear
 
 __all__ = [
     'BBB3Conv3FC',

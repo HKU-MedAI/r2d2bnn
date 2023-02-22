@@ -45,6 +45,17 @@ class R2D2MultipleLinear(nn.Module):
         fc_out = R2D2LinearLayer(out_channel, outputs, self.priors)
         self.dense_block.add_module(f"fc_out", fc_out)
 
+    def analytic_update(self):
+        """
+        Calculates the update of the model parameters with
+        analytic update equations
+        """
+        for module in self.children():
+            if hasattr(module, 'analytic_update'):
+                module.analytic_update()
+
+        return None
+
     def kl_loss(self):
         # Compute KL divergences
         kl = 0.0

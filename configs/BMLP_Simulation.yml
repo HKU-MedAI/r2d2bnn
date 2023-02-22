@@ -6,13 +6,14 @@ gpu_ids: [2]
 
 
 #### datasets
-dataset:
+data:
   name: "simulated"
   n: 10000
+  scenario: 3
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/BMLP_L0/"
+  path: "./checkpoints/Simulations/BMLP_L3_S3/"
   save_checkpoint_freq: 5
 
 
@@ -29,7 +30,7 @@ train:
   num_epochs: 100
   batch_size: 1024
   train_size: 1
-  n_blocks: 0
+  n_blocks: 3
 
   beta: 0.001
   prior_mu: 0

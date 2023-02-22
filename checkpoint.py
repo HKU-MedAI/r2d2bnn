@@ -154,6 +154,7 @@ class CheckpointManager:
 
         # Save training stats here
         self.append_stats(epoch_stats)
+        self.stats = epoch_stats
 
         # Save model state dicts
         self.save_model(state_dicts)

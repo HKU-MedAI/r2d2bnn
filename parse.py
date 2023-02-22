@@ -17,11 +17,12 @@ from models import (
     R2D2MultipleLinear,
     ResNet,
     CNN,
+    MultipleLinear
 )
 from models.frequentists import LeNet, EfficientNetB4, AlexNet
 from torchvision.models import resnet18, resnet50
 
-from losses import ELBO, SSIMLoss
+from losses import ELBO
 
 
 def parse_optimizer(config_optim, params):
@@ -147,7 +148,8 @@ def parse_bayesian_model(config_train, image_size=32):
         return BBBHorseshoeLeNet(
             outputs=out_dim,
             inputs=in_dim,
-            priors=priors
+            priors=priors,
+            image_size=image_size
         )
     elif model_name == "HorseshoeCNN":
         n_blocks = config_train["n_blocks"]
@@ -249,6 +251,13 @@ def parse_frequentist_model(config_freq, image_size=32):
     elif model_name == "CNN":
         n_blocks = config_freq["n_blocks"]
         return CNN(
+            outputs=out_dim,
+            inputs=in_dim,
+            n_blocks=n_blocks
+        )
+    elif model_name == "MLP":
+        n_blocks = config_freq["n_blocks"]
+        return MultipleLinear(
             outputs=out_dim,
             inputs=in_dim,
             n_blocks=n_blocks

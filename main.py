@@ -13,7 +13,9 @@ from trainer import (
     BNNHorseshoeTrainer,
     R2D2BNNTrainer,
     R2D2LinearRegTrainer,
-    BNNUncertaintyTrainer
+    HorseshoeLinearRegTrainer,
+    MCDLinearRegTrainer,
+    BNNUncertaintyTrainer,
 )
 from utils import ordered_yaml
 
@@ -24,7 +26,7 @@ parser.add_argument('-seed', type=int, help='random seed of the run', default=61
 args = parser.parse_args()
 
 opt_path = args.config
-default_config_path = "BMLP_Simulation.yml"
+default_config_path = "R2D2LeNet_CIFAR10.yml"
 
 if opt_path == "":
     opt_path = CONFIG_DIR / default_config_path
@@ -62,6 +64,10 @@ def main():
             trainer = BLinearRegTrainer(config)
         elif config["train_type"] == "r2d2-linreg":
             trainer = R2D2LinearRegTrainer(config)
+        elif config["train_type"] == "horseshoe-linreg":
+            trainer = HorseshoeLinearRegTrainer(config)
+        elif config["train_type"] == "mcd-linreg":
+            trainer = MCDLinearRegTrainer(config)
         elif config["train_type"] == "bnn-uncertainty":
             trainer = BNNUncertaintyTrainer(config)
         else:

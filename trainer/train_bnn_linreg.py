@@ -52,42 +52,57 @@ class BLinearRegTrainer(Trainer):
 
         self.optimzer.step()
 
+        if hasattr(self.model, "analytic_update"):
+            self.model.analytic_update()
+
         return loss.item(), mse_loss.item(), kl_loss.item(), label
 
     def valid_one_step(self, data, label):
 
-        pred = self.model(data)
+        preds = [self.model(data).squeeze() for _ in range(100)]
+        preds = torch.stack(preds)
+        pred_var = preds.var(0)
         kl_loss = self.model.kl_loss()
 
-        mse_loss = ((pred.squeeze() - label) ** 2).mean()
+        mse_loss = ((preds.mean(0) - label) ** 2).mean()
 
         loss = mse_loss + kl_loss * self.beta
 
-        loss.backward()
-
-        return loss.item(), mse_loss.item(), kl_loss.item(), label, pred
+        return loss.item(), mse_loss.item(), kl_loss.item(), label, preds, pred_var
 
     def validate(self, epoch):
         valid_loss_list = []
         valid_kl_list = []
         valid_mse_list = []
+        valid_var_list = []
         preds = []
         labels = []
+        data_list = []
+
 
         for i, (data, label) in enumerate(self.valid_loader):
             (data, label) = (data.to(self.device), label.to(self.device))
             # beta = utils.get_beta(i - 1, len(self.valid_loader), "Standard", epoch, self.n_epoch)
-            res, mse, kl, label, pred = self.valid_one_step(data, label)
+            res, mse, kl, label, pred, pred_var = self.valid_one_step(data, label)
 
             labels.append(label.detach().cpu().numpy())
             preds.append(pred.detach().cpu().numpy())
+            data_list.append(data.detach().cpu().numpy())
+            valid_var_list.append(pred_var.detach().cpu().numpy())
 
             valid_loss_list.append(res)
             valid_mse_list.append(mse)
             valid_kl_list.append(kl)
 
+        preds = np.concatenate(preds, axis=1)
+        labels = np.concatenate(labels)
+        x = np.concatenate(data_list, axis=0)
+
+        self.visualize_conf_interval(preds, labels, x)
+
         valid_loss, valid_kl, valid_mse = np.mean(valid_loss_list), np.mean(valid_kl_list), np.mean(valid_mse_list)
-        valid_var = float(np.var(np.concatenate(preds)))
+        valid_var = np.concatenate(valid_var_list)
+        valid_var = float(np.mean(valid_var))
 
         return valid_loss, valid_kl, valid_mse, valid_var
 

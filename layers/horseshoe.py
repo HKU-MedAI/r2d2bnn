@@ -82,12 +82,12 @@ class HorseshoeLinearLayer(nn.Module):
         # is the prior distribution ovev
         if priors["log_v_mean"] == None:
             distr = HalfCauchy(1 / np.sqrt(self.prior_theta_rate))
-            sample = distr.sample()
+            sample = distr.sample().squeeze()
             self.log_v_mean = nn.Parameter(torch.log(sample))
         else:
             self.log_v_mean = priors["log_v_mean"]
 
-        self.log_v_rho = nn.Parameter(torch.ones([1, 1]) * priors["log_v_rho_scale"])
+        self.log_v_rho = nn.Parameter(torch.ones([1]) * priors["log_v_rho_scale"])
         self.log_v = ReparametrizedGaussian(self.log_v_mean, self.log_v_rho)
 
 

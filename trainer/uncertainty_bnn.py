@@ -105,62 +105,98 @@ class BNNUncertaintyTrainer(Trainer):
 
     def valid_one_step(self, data, label):
 
+        # Develop
+
         data = data.to(self.device)
 
         # Monte Carlo samples from different dropout mask at test time
         with torch.no_grad():
             scores = [self.model(data) for _ in range(self.n_samples)]
-            if scores[0].dim() > 2 :
+            if scores[0].dim() > 2:
                 scores = [s.mean(0) for s in scores]
         s = [torch.exp(a) for a in scores]
         s0 = [torch.sum(a, dim=1, keepdim=True) for a in s]
         probs = [a / a0 for (a, a0) in zip(s, s0)]
         ret = [-torch.sum(v * torch.log(v), dim=1) for v in probs]
         entropy = torch.stack(ret).mean(0)
+        conf = torch.max(torch.stack(probs).mean(0), dim=1).values
 
-        return entropy
+        return entropy, conf
 
     def validate(self, epoch):
 
         valid_loss_list = []
-        in_score_list = []
-        out_score_list = []
+        in_score_list_ent = []
+        out_score_list_ent = []
+        in_score_list_conf = []
+        out_score_list_conf = []
 
         for i, (data, label) in enumerate(self.test_in_loader):
-            scores = self.valid_one_step(data, label)
-            in_score_list.append(scores)
+            in_scores_ent,  in_scores_conf = self.valid_one_step(data, label)
+            in_score_list_ent.append(in_scores_ent)
+            in_score_list_conf.append(in_scores_conf)
 
         for i, (data, label) in enumerate(self.test_out_loader):
-            scores = self.valid_one_step(data, label)
-            out_score_list.append(scores)
+            out_scores_ent,  out_scores_conf = self.valid_one_step(data, label)
+            out_score_list_ent.append(out_scores_ent)
+            out_score_list_conf.append(out_scores_conf)
 
-        in_scores = torch.cat(in_score_list)
-        out_scores = torch.cat(out_score_list)
+        in_scores_ent = torch.cat(in_score_list_ent)
+        out_scores_ent = torch.cat(out_score_list_ent)
+        in_scores_conf = torch.cat(in_score_list_conf)
+        out_scores_conf = torch.cat(out_score_list_conf)
 
-        labels = torch.cat(
-            [torch.ones(in_scores.shape),
-             torch.zeros(out_scores.shape)]
+        labels_1 = torch.cat(
+            [torch.ones(in_scores_ent.shape),
+             torch.zeros(out_scores_ent.shape)]
+        ).detach().cpu().numpy()
+        labels_2 = torch.cat(
+            [torch.zeros(in_scores_ent.shape),
+             torch.ones(out_scores_ent.shape)]
         ).detach().cpu().numpy()
 
-        scores = torch.cat([in_scores, out_scores]).detach().cpu().numpy()
+        ent_scores = torch.cat([in_scores_ent, out_scores_ent]).detach().cpu().numpy()
+        conf_scores = torch.cat([in_scores_conf, out_scores_conf]).detach().cpu().numpy()
 
-        index = np.isposinf(scores)
-        scores[np.isposinf(scores)] = 1e9
-        maximum = np.amax(scores)
-        scores[np.isposinf(scores)] = maximum + 1
+        def format_scores(scores):
 
-        index = np.isneginf(scores)
-        scores[np.isneginf(scores)] = -1e9
-        minimum = np.amin(scores)
-        scores[np.isneginf(scores)] = minimum - 1
+            index = np.isposinf(scores)
+            scores[np.isposinf(scores)] = 1e9
+            maximum = np.amax(scores)
+            scores[np.isposinf(scores)] = maximum + 1
 
-        scores[np.isnan(scores)] = 0
+            index = np.isneginf(scores)
+            scores[np.isneginf(scores)] = -1e9
+            minimum = np.amin(scores)
+            scores[np.isneginf(scores)] = minimum - 1
 
-        auroc = roc_auc_score(labels, scores)
-        precision, recall, thresholds = precision_recall_curve(labels, scores)
-        aupr = auc(recall, precision)
+            scores[np.isnan(scores)] = 0
 
-        return auroc, aupr, precision, recall
+            return scores
+
+        ent_scores = format_scores(ent_scores)
+        conf_scores = format_scores(conf_scores)
+
+        def comp_aucs(scores, labels_1, labels_2):
+
+            auroc_1 = roc_auc_score(labels_1, scores)
+            auroc_2 = roc_auc_score(labels_2, scores)
+            auroc = max(auroc_1, auroc_2)
+
+            precision, recall, thresholds = precision_recall_curve(labels_1, scores)
+            aupr_1 = auc(recall, precision)
+
+            precision, recall, thresholds = precision_recall_curve(labels_2, scores)
+            aupr_2 = auc(recall, precision)
+
+            aupr = max(aupr_1, aupr_2)
+
+            return auroc, aupr
+
+        ent_auroc, ent_aupr = comp_aucs(ent_scores, labels_1, labels_2)
+        conf_auroc, conf_aupr = comp_aucs(conf_scores, labels_1, labels_2)
+
+        return ent_auroc, ent_aupr, conf_auroc, conf_aupr
 
     def train(self) -> None:
         print(f"Start training Uncertainty BNN...")
@@ -196,11 +232,11 @@ class BNNUncertaintyTrainer(Trainer):
             labels = np.concatenate(labels)
             train_precision, train_recall, train_f1, train_aucroc = utils.metrics(probs, labels, average="weighted")
 
-            valid_auc, valid_aupr, precision, recall = self.validate(epoch)
+            ent_auroc, ent_aupr, conf_auroc, conf_aupr = self.validate(epoch)
 
             training_range.set_description(
-                'Epoch: {} \tTraining Loss: {:.4f} \tTraining Accuracy: {:.4f} \tValidation AUC: {:.4f} \tValidation AUPR: {:.4f} \tTrain_kl_div: {:.4f} \tTrain_nll: {:.4f}'.format(
-                    epoch, train_loss, train_acc, valid_auc, valid_aupr, train_kl, train_nll))
+                'Epoch: {} \tTraining Loss: {:.4f} \tTraining Accuracy: {:.4f} \tEntropy AUC: {:.4f} \tEntropy AUPR: {:.4f} \tConf AUROC: {:.4f} \tConf AUPR: {:.4f}'.format(
+                    epoch, train_loss, train_acc, ent_auroc, ent_aupr, conf_auroc, conf_aupr))
 
             # Update new checkpoints and remove old ones
             if self.save_steps and (epoch + 1) % self.save_steps == 0:
@@ -212,8 +248,10 @@ class BNNUncertaintyTrainer(Trainer):
                     "Train Accuracy": train_acc,
                     "Train F1": train_f1,
                     "Train AUC": train_aucroc,
-                    "Validation AUPR": valid_aupr,
-                    "Validation AUC": valid_auc,
+                    "ENT AUPR": ent_aupr,
+                    "ENT AUC": ent_auroc,
+                    "CONF AUPR": conf_aupr,
+                    "CONF AUC": conf_auroc,
                 }
 
                 # State dict of the model including embeddings

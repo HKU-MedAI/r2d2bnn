@@ -7,8 +7,8 @@ import torch.nn.functional as F
 from torch.distributions import HalfCauchy, Dirichlet, Exponential
 from distributions import ReparametrizedGaussian, ScaleMixtureGaussian,\
     InverseGamma, Exponential, Gamma, InvGaussian, GeneralizedInvGaussian
-from scipy.special import loggamma
-from losses import calculate_kl
+from scipy.special import kn, kvp, gamma, digamma, loggamma
+from losses import calculate_kl, KLDivergence
 
 
 class R2D2ConvLayer(nn.Module):
@@ -195,6 +195,9 @@ class R2D2ConvLayer(nn.Module):
         self.phi[self.phi == 0] += 1e-8
 
     def kl_loss(self):
+        return self.analytic_kl()
+
+    def gaussian_kl_loss(self):
         beta = self.beta_.mean.detach()
         bias = self.bias.mean.detach()
         beta_sigma = self.beta_.std_dev.detach()
@@ -202,3 +205,76 @@ class R2D2ConvLayer(nn.Module):
         kl = calculate_kl(self.prior_mu, self.prior_beta_sigma, beta, beta_sigma)
         kl += calculate_kl(self.prior_mu, self.prior_bias_sigma, bias, bias_sigma)
         return kl
+
+    def analytic_kl(self):
+
+        def log_expect_gig(p, a, b):
+            const = np.log(np.sqrt(b) / np.sqrt(a))
+            der = kvp(p, np.sqrt(a * b))
+            bessel = kn(p, np.sqrt(a * b))
+            if np.isnan(der / bessel).any() or np.isinf(der / bessel).any():
+                log_der = -1
+            else:
+                log_der = der / bessel
+
+            return log_der + const
+
+        def kl_gamma(a, b, c, d):
+            def info(a, b, c, d):
+                return - (c * d) / a - loggamma(b) - b * np.log(a) \
+                + (b-1) * digamma(d) + (b - 1) * np.log(c)
+
+            return info(c, d, c, d) - info(a, b, c, d)
+
+        # Snapshot the current parameters
+        omega = self.omega.detach().cpu().numpy()
+        xi = self.xi.detach().cpu().numpy()
+
+        # Compute the KL divergences of the current parameters
+        kl_beta_sigma = self.gaussian_kl_loss().item()
+
+        # Compute the KL divergence of xi
+        b = self.prior_xi_shape.item()
+        a = self.a_pi * self.tot_dim
+        kl_xi = kl_gamma(a + b, 1 + omega, b, 1)
+
+        # Compute the KL divergence of omega
+        alpha = self.a_pi * self.tot_dim
+        p, a, b = self.omega_gib.lamb, \
+                  self.omega_gib.rho.detach().numpy(), \
+                  self.omega_gib.chi.detach().numpy()
+        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-5
+        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-5
+        bessel_ratio = 1 if np.isnan(bassel_plus / bassel) else bassel_plus / bassel
+
+        log_omega_exp = log_expect_gig(p, a, b)
+        omega_exp = np.sqrt(b / a) * bessel_ratio
+        inverse_omega_exp = np.sqrt(a / b) * bessel_ratio - 2 * p / b
+
+        kl_omega = p / 2 * np.log(a / b) - np.log(2) - np.log(bassel) + (p - a) * log_omega_exp \
+                   + 0.5 * a * omega_exp + 0.5 * b * inverse_omega_exp - a * np.log(xi) + loggamma(alpha)
+
+        # Compute KL divergence of psi
+        p, a, b = self.psi_gib.lamb.detach().numpy(), \
+                  self.psi_gib.rho.detach().numpy(), \
+                  self.psi_gib.chi.detach().numpy()
+        mu = np.sqrt(1 / a)
+        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-5
+        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-5
+        bessel_ratio = 1 if np.isnan(bassel_plus / bassel).any() else bassel_plus / bassel
+
+        log_psi_exp = log_expect_gig(p, a, b)
+        psi_exp = np.sqrt(b / a) * bessel_ratio
+        inverse_psi_exp = np.sqrt(a / b) * bessel_ratio - 2 * p / b
+        kl_psi = psi_exp / 2 * mu - 1 + 0.5 * (mu + 1) * inverse_psi_exp + log_psi_exp
+        kl_psi = kl_psi.mean()
+
+        # Sample from posterior distribution of phi
+        t = self.t_gib.sample()
+        phi_post = t / torch.sum(t)
+        phi_prior = self.phi_.sample()
+
+        #Compute KL divergences of phi
+        kl_phi = KLDivergence()(phi_post, phi_prior).item()
+
+        return (kl_beta_sigma + kl_omega + kl_phi + kl_xi + kl_psi).item()

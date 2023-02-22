@@ -1,18 +1,19 @@
 #### general settings
-name: BPN
-train_type: r2d2-linreg
+name: Horseshoe
+train_type: horseshoe-linreg
 eval_type: bnn
 gpu_ids: [2]
 
 
 #### datasets
-dataset:
+data:
   name: "simulated"
   n: 10000
+  scenario: 4
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/HorseshoeMLP_L1/"
+  path: "./checkpoints/HorseshoeMLP_L3_S4/"
   save_checkpoint_freq: 5
 
 
@@ -29,7 +30,7 @@ train:
   num_epochs: 100
   batch_size: 1024
   train_size: 1
-  n_blocks: 1
+  n_blocks: 3
 
   beta: 0.0001
 
@@ -43,7 +44,7 @@ train:
   log_v_mean:
   log_v_rho_scale: -5.
 
-  in_channels: 4
+  in_channels: 200
   out_channels: 1
 
   loss: "ELBO"

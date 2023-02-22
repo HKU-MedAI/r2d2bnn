@@ -1,5 +1,5 @@
 """
-Trainer of R2D2 BNN Linear Regression
+Trainer of BNN
 """
 from tqdm import tqdm
 
@@ -22,13 +22,13 @@ import torchvision
 import torch
 
 
-class R2D2LinearRegTrainer(Trainer):
+class BLinearRegTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
 
         self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size)
 
-        self.model = parse_bayesian_model(self.config_train)
+        self.model = parse_bayesian_model(self.config_train).to(self.device)
         self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
         self.loss_fcn = parse_loss(self.config_train)
@@ -41,68 +41,53 @@ class R2D2LinearRegTrainer(Trainer):
     def train_one_step(self, data, label):
         self.optimzer.zero_grad()
 
+        outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
         pred = self.model(data)
-        pred = pred.mean(0)
         kl_loss = self.model.kl_loss()
 
         mse_loss = ((pred.squeeze() - label) ** 2).mean()
-        loss = mse_loss + kl_loss.item() * self.beta
+        loss = mse_loss + kl_loss * self.beta
 
         loss.backward()
 
         self.optimzer.step()
-
-        self.model.analytic_update()
 
         return loss.item(), mse_loss.item(), kl_loss.item(), label
 
     def valid_one_step(self, data, label):
 
         pred = self.model(data)
-        pred_var = pred.squeeze().var(0)
         kl_loss = self.model.kl_loss()
 
-        mse_loss = ((pred.mean(0).squeeze() - label) ** 2).mean()
+        mse_loss = ((pred.squeeze() - label) ** 2).mean()
 
-        loss = mse_loss + kl_loss.item() * self.beta
+        loss = mse_loss + kl_loss * self.beta
 
         loss.backward()
 
-        return loss.item(), mse_loss.item(), kl_loss.item(), label, pred, pred_var
+        return loss.item(), mse_loss.item(), kl_loss.item(), label, pred
 
     def validate(self, epoch):
         valid_loss_list = []
         valid_kl_list = []
         valid_mse_list = []
-        valid_var_list = []
         preds = []
         labels = []
-        data_list = []
 
         for i, (data, label) in enumerate(self.valid_loader):
-            # (data, label) = (data.to(self.device), label.to(self.device))
-            label = label.to(self.device)
+            (data, label) = (data.to(self.device), label.to(self.device))
             # beta = utils.get_beta(i - 1, len(self.valid_loader), "Standard", epoch, self.n_epoch)
-            res, mse, kl, label, pred, pred_var = self.valid_one_step(data, label)
+            res, mse, kl, label, pred = self.valid_one_step(data, label)
 
             labels.append(label.detach().cpu().numpy())
-            preds.append(pred.squeeze().detach().cpu().numpy())
-            data_list.append(data.detach().cpu().numpy())
-            valid_var_list.append(pred_var.detach().cpu().numpy())
+            preds.append(pred.detach().cpu().numpy())
 
             valid_loss_list.append(res)
             valid_mse_list.append(mse)
             valid_kl_list.append(kl)
 
-        preds = np.concatenate(preds, axis=1)
-        labels = np.concatenate(labels)
-        x = np.concatenate(data_list, axis=0)
-
-        self.visualize_conf_interval(preds, labels, x)
-
         valid_loss, valid_kl, valid_mse = np.mean(valid_loss_list), np.mean(valid_kl_list), np.mean(valid_mse_list)
-        valid_var = np.concatenate(valid_var_list)
-        valid_var = float(np.mean(valid_var))
+        valid_var = float(np.var(np.concatenate(preds)))
 
         return valid_loss, valid_kl, valid_mse, valid_var
 
@@ -115,9 +100,10 @@ class R2D2LinearRegTrainer(Trainer):
             mse_list = []
             kl_list = []
 
+            beta = self.beta
+
             for i, (data, label) in enumerate(self.dataloader):
-                # (data, label) = (data.to(self.device), label.to(self.device))
-                label = label.to(self.device)
+                (data, label) = (data.to(self.device), label.to(self.device))
 
                 res, mse, kl, label = self.train_one_step(data, label)
 
@@ -154,4 +140,3 @@ class R2D2LinearRegTrainer(Trainer):
 
                 # Remove previous checkpoints
                 self.checkpoint_manager.remove_old_version()
-

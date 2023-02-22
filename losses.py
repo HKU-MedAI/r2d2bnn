@@ -4,8 +4,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from piqa import SSIM
-
 
 class KLDivergence(nn.Module):
     def __init__(self):
@@ -58,13 +56,7 @@ class SVDD(nn.Module):
         nll_loss = F.nll_loss(input, target, reduction='mean') * self.train_size
         kl_loss = beta * kl
         total_loss = nll_loss + kl_loss
-        return total_loss, nll_loss, kl_loss 
-
-
-class SSIMLoss(SSIM):
-    def forward(self, x, y):
-        return 1. - super().forward(x, y)
-
+        return total_loss, nll_loss, kl_loss
 
 def acc(outputs, targets):
     return np.mean(outputs.cpu().numpy().argmax(axis=1) == targets.data.cpu().numpy())

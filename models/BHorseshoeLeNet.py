@@ -79,6 +79,15 @@ class BBBHorseshoeLeNet(nn.Module):
 
         return None
 
+    def kl_loss(self):
+        # Compute KL divergences
+        kl = 0.0
+        for module in self.children():
+            if hasattr(module, 'kl_loss'):
+                kl = kl + module.kl_loss()
+
+        return kl
+
     def forward(self, x):
 
         x = self.conv1(x)

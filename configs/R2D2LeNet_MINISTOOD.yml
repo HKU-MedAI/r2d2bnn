@@ -6,7 +6,7 @@ gpu_ids: [2]
 
 
 #### datasets
-dataset:
+data:
   name: "BDLB"
   image_size: 256
   train_path: None

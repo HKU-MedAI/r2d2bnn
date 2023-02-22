@@ -40,7 +40,7 @@
       <paths name="r11user1@research11.saas.hku.hk:22 password">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/r11user1/r2d2bnn" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/r2d2bnn" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
@@ -59,6 +59,20 @@
         </serverdata>
       </paths>
       <paths name="r11user1@research11.saas.hku.hk:22 password (3)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="r11user1@research11.saas.hku.hk:22 password (4)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="r11user1@research11.saas.hku.hk:22 password (5)">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />

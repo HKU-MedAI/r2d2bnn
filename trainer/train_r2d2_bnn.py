@@ -53,11 +53,11 @@ class R2D2BNNTrainer(Trainer):
 
         # outputs[:, :, 0] = F.log_softmax(pred, dim=1)
         # pred = utils.logmeanexp(outputs, dim=2)
-        pred = F.normalize(pred, 1)  # Temporary solutions normalizing the graidents
+        # pred = F.normalize(pred, 1)  # Temporary solutions normalizing the graidents
         kl_loss = self.model.kl_loss()
         ce_loss = F.cross_entropy(pred, label, reduction='mean')
 
-        loss = ce_loss + kl_loss.item() * self.beta
+        loss = ce_loss + kl_loss * self.beta
         # loss = ce_loss
         loss.backward()
 
@@ -67,7 +67,7 @@ class R2D2BNNTrainer(Trainer):
 
         acc = utils.acc(pred.data, label)
 
-        return loss.item(), kl_loss.item(), ce_loss.item(), acc, pred
+        return loss.item(), kl_loss, ce_loss.item(), acc, pred
 
     def valid_one_step(self, data, label, beta):
 
@@ -85,7 +85,7 @@ class R2D2BNNTrainer(Trainer):
 
         acc = utils.acc(pred.data, label)
 
-        return loss.item(), kl_loss.item(), nll_loss.item(), acc, pred
+        return loss.item(), kl_loss, nll_loss.item(), acc, pred
 
     def validate(self, epoch):
         valid_loss_list = []

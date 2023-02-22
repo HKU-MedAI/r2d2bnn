@@ -6,21 +6,21 @@ gpu_ids: [2]
 
 
 #### datasets
-dataset:
+data:
   name: "CIFAR10"
   image_size: 32
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2CNN_L4_CIFAR10/"
+  path: "./checkpoints/R2D2CNN_L2_CIFAR10/"
   save_checkpoint_freq: 2
 
 
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.0005  # Learning rate
+  lr: 0.001  # Learning rate
   weight_decay: 0
 
 #### training settings: learning rate scheme, loss, optimizer
@@ -30,7 +30,7 @@ train:
   num_epochs: 2000
   batch_size: 1024
   train_size: 1
-  n_blocks: 4
+  n_blocks: 2
 
   beta: 0.0001
 

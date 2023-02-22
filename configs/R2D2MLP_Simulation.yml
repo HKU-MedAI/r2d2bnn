@@ -1,18 +1,19 @@
 #### general settings
-name: BPN
+name: R2D2
 train_type: r2d2-linreg
 eval_type: bnn
 gpu_ids: [2]
 
 
 #### datasets
-dataset:
+data:
   name: "simulated"
   n: 10000
+  scenario: 4
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2MLP_L3/"
+  path: "./checkpoints/R2D2MLP_L3_S4/"
   save_checkpoint_freq: 5
 
 
@@ -26,7 +27,7 @@ optimizer:
 train:
   model_name: "R2D2MLP"
 
-  num_epochs: 100
+  num_epochs: 200
   batch_size: 1024
   train_size: 1
   n_blocks: 3
@@ -41,7 +42,7 @@ train:
   weight_xi_shape: 0.3
   weight_omega_shape: 0.5
 
-  in_channels: 4
+  in_channels: 200
   out_channels: 1
 
   loss: "ELBO"

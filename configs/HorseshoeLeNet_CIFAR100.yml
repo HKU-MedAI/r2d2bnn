@@ -6,7 +6,7 @@ gpu_ids: [2]
 
 
 #### datasets
-dataset:
+data:
   name: "CIFAR100"
   image_size: 32
   train_path: None
@@ -43,7 +43,7 @@ train:
   log_v_mean:
   log_v_rho_scale: -5.
 
-  in_channels: 3
-  out_channels: 100
+  in_channels: 1
+  out_channels: 11
 
   loss: "ELBO"

@@ -1,15 +1,18 @@
 from abc import ABC
 from collections import OrderedDict
 
+import numpy as np
+import torch
 
 from checkpoint import CheckpointManager
+from matplotlib import pyplot as plt
 
 
 class Trainer(ABC):
     def __init__(self, config: OrderedDict) -> None:
         # Categorize configurations
         self.config = config
-        self.config_data = config["dataset"]
+        self.config_data = config["data"]
         self.config_train = config['train']
         self.config_optim = config['optimizer']
         self.config_checkpoint = config['checkpoints']
@@ -32,3 +35,34 @@ class Trainer(ABC):
 
     def train(self) -> None:
         raise NotImplementedError
+
+    def visualize_conf_interval(self, pred, label, x):
+        """
+        Visualize confidence interval for regressors
+        pred: (S, N)
+        label (N) ground truth of the function
+        """
+        pth = self.checkpoint_manager.path / "conf_int.png"
+        labels_path = self.checkpoint_manager.path / "labels.npy"
+        pred_path = self.checkpoint_manager.path / "pred.npy"
+
+        upper = np.max(pred, axis=0)
+        lower = np.min(pred, axis=0)
+
+        indices = np.argsort(x[:, 0])
+
+        fig, ax = plt.subplots()
+        ax.plot(x[indices, 0], label[indices])
+        ax.fill_between(x[indices, 0], lower[indices], upper[indices], color='b', alpha=.1)
+
+        plt.xlim([-5, 5])
+        plt.ylim([-200, 200])
+
+        # Save figure to checkpoint
+        plt.savefig(pth)
+
+        # Save labels
+        np.save(labels_path, label)
+        np.save(pred_path, pred)
+
+        plt.close()

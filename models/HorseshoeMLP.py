@@ -55,6 +55,17 @@ class HorseshoeMultipleLinear(nn.Module):
 
         return kl
 
+    def analytic_update(self):
+        """
+        Calculates the update of the model parameters with
+        analytic update equations
+        """
+        for module in self.children():
+            if hasattr(module, 'analytic_update'):
+                module.analytic_update()
+
+        return None
+
     def forward(self, x):
         x = self.dense_block(x)
         return x
