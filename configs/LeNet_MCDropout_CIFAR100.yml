@@ -20,7 +20,7 @@ checkpoints:
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.005  # Learning rate
+  lr: 0.01  # Learning rate
   weight_decay: 0.001
 
 #### training settings: learning rate scheme, loss, optimizer

@@ -33,6 +33,8 @@ class Trainer(ABC):
         self.device = "cuda" if config['gpu_ids'] else "cpu"
         self.use_gpu = True if self.device == "cuda" else False
 
+        self.model = None
+
     def train(self) -> None:
         raise NotImplementedError
 
@@ -48,18 +50,20 @@ class Trainer(ABC):
 
         upper = np.max(pred, axis=0)
         lower = np.min(pred, axis=0)
+        mean = np.mean(pred, axis=0)
 
         indices = np.argsort(x[:, 0])
 
         fig, ax = plt.subplots()
-        ax.plot(x[indices, 0], label[indices])
-        ax.fill_between(x[indices, 0], lower[indices], upper[indices], color='b', alpha=.1)
+        ax.scatter(x[indices, 0], label[indices])
+        ax.scatter(x[indices, 0], mean[indices])
+        ax.fill_between(x[indices, 0], lower[indices], upper[indices], color='b', alpha=.5)
 
         plt.xlim([-5, 5])
         plt.ylim([-200, 200])
 
         # Save figure to checkpoint
-        plt.savefig(pth)
+        plt.savefig(pth, dpi=1200)
 
         # Save labels
         np.save(labels_path, label)

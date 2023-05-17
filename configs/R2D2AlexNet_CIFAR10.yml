@@ -13,14 +13,14 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2AlexNet_CIFAR10/"
+  path: "./checkpoints/R2D2_v3_AlexNet_CIFAR10_f2/"
   save_checkpoint_freq: 2
 
 
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.0005  # Learning rate
+  lr: 0.001  # Learning rate
   weight_decay: 0.0001
 
 #### training settings: learning rate scheme, loss, optimizer
@@ -36,8 +36,8 @@ train:
   r2d2_scale:
   prior_phi_prob: 0.6
   prior_psi_shape: 0.5
-  beta_rho_scale: [-4, 0.2]
-  bias_rho_scale: [-4, 0.2]
+  beta_rho_scale: [-5, 0.2]
+  bias_rho_scale: [-5, 0.2]
 
   weight_xi_shape: 0.3
   weight_omega_shape: 0.5

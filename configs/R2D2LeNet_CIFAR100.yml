@@ -13,7 +13,7 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2LeNet_CIFAR100/"
+  path: "./checkpoints/R2D2v3_LeNet_CIFAR100/"
   save_checkpoint_freq: 2
 
 

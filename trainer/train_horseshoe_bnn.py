@@ -21,6 +21,7 @@ import torchvision.transforms as transforms
 import torchvision
 import torch
 
+from matplotlib import pyplot as plt
 
 class BNNHorseshoeTrainer(Trainer):
     def __init__(self, config):
@@ -113,7 +114,7 @@ class BNNHorseshoeTrainer(Trainer):
         return valid_loss, valid_acc, valid_kl, valid_nll, precision, recall, f1, aucroc
 
     def train(self) -> None:
-        print(f"Start training BNN...")
+        print(f"Start training Horseshoe BNN...")
 
         training_range = tqdm(range(self.n_epoch))
         for epoch in training_range:
@@ -125,6 +126,8 @@ class BNNHorseshoeTrainer(Trainer):
             labels = []
 
             beta = self.beta
+
+            self.visualize_map(epoch)
 
             for i, (data, label) in enumerate(self.dataloader):
                 label = label.to(self.device)
@@ -177,3 +180,48 @@ class BNNHorseshoeTrainer(Trainer):
 
                 # Remove previous checkpoints
                 self.checkpoint_manager.remove_old_version()
+
+    def visualize_map(self, epoch):
+        """
+        Visualize the convolutional map of the features
+        """
+
+        fig, ax = plt.subplots(4, 5, figsize=(36, 10))
+
+        pth = self.checkpoint_manager.path / "visualizations"
+        if not pth.exists():
+            pth.mkdir()
+
+        # layer = self.model.convs[0]
+        layer = self.model.conv1
+
+        # Sample maps here
+        beta = layer.beta.sample(200)
+        log_tau = torch.unsqueeze(layer.log_tau.sample(200), 1)
+        log_v = torch.unsqueeze(layer.log_v.sample(200), 1)
+
+        weight = beta * log_tau * log_v
+        weight= weight.mean(0).squeeze().detach().cpu().numpy()
+
+        norms = np.linalg.norm(weight, axis=(1, 2))
+        max_indices = torch.from_numpy(norms).topk(5).indices
+        min_indices = (- torch.from_numpy(norms)).topk(5).indices
+
+        for i in range(5):
+            ax[0, i].imshow(weight[max_indices[i]], cmap='gray',  vmin=weight.min(), vmax=weight.max())
+            ax[1, i].imshow(weight[min_indices[i]], cmap='gray', vmin=weight.min(), vmax=weight.max())
+
+        d = self.dataloader.dataset[0][0].unsqueeze(0).cuda()
+        mp = self.model.get_map(d).squeeze().detach().cpu().numpy()
+        norms = np.linalg.norm(mp, axis=(1, 2))
+        max_indices = torch.from_numpy(norms).topk(5).indices
+        min_indices = (- torch.from_numpy(norms)).topk(5).indices
+
+        # fig, ax = plt.subplots()
+        for i in range(5):
+            ax[2, i].imshow(mp[max_indices[i]], cmap='gray')
+            ax[3, i].imshow(mp[min_indices[i]], cmap='gray')
+
+        plt.savefig(pth / f"MNIST_ep{epoch}.png")
+
+        return

@@ -13,7 +13,7 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/HorseshoeCNN_L4_CIFAR10/"
+  path: "./checkpoints/HorseshoeCNN_L2_CIFAR10/"
   save_checkpoint_freq: 2
 
 
@@ -30,7 +30,7 @@ train:
   num_epochs: 1000
   batch_size: 128
   train_size: 1
-  n_blocks: 4
+  n_blocks: 2
 
   beta: 0.00001
 
@@ -39,8 +39,8 @@ train:
   weight_cauchy_scale: 1.
   beta_rho_scale: -5.
   log_tau_mean:
-  log_tau_rho_scale: -5.
-  bias_rho_scale: -5.
+  log_tau_rho_scale: -4.
+  bias_rho_scale: -4.
   log_v_mean:
   log_v_rho_scale: -5.
 

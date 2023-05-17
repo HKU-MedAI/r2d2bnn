@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 import torchvision
 from torchvision import transforms
 
+from models import MultipleLinear
 
 def load_data(config_data, batch_size=32):
     if config_data["name"] == "MNIST":
@@ -38,6 +39,28 @@ def load_data(config_data, batch_size=32):
         train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
         testset = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_cifar)
         valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
+    elif config_data["name"] == "Omniglot":
+        transform = transforms.Compose([
+            transforms.Resize((32, 32)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+        ])
+        training_data = torchvision.datasets.Omniglot(root='./data', background=True, download=True,
+                                                     transform=transform)
+        train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
+        testset = torchvision.datasets.Omniglot(root='./data', background=False, download=True, transform=transform)
+        valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
+    elif config_data["name"] == "FashionMNIST":
+        transform = transforms.Compose([
+            transforms.Resize((32, 32)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+        ])
+        training_data = torchvision.datasets.FashionMNIST(root='./data', train=True, download=True,
+                                                     transform=transform)
+        train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
+        testset = torchvision.datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
+        valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
     elif config_data["name"] == "simulated":
         n = config_data["n"]
         scenario = config_data["scenario"]
@@ -51,6 +74,38 @@ def load_data(config_data, batch_size=32):
 
     return train_dataloader, valid_loader
 
+
+def load_uncertainty_data(name, train, image_size, in_channel):
+    if in_channel == 3:
+        norm = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    else:
+        norm = transforms.Normalize((0.1307,), (0.3081,))
+    transform = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.Grayscale(num_output_channels=in_channel),
+            torchvision.transforms.ToTensor(),
+            norm,
+            torchvision.transforms.Resize(image_size)
+        ])
+    if name == "MNIST":
+        d = torchvision.datasets.MNIST
+    elif name == "FashionMNIST":
+        d = torchvision.datasets.FashionMNIST
+    elif name == "CIFAR10":
+        d = torchvision.datasets.CIFAR10
+    elif name == "CIFAR100":
+        d = torchvision.datasets.CIFAR100
+    elif name == "Omiglot":
+        d = torchvision.datasets.Omniglot
+        return d(root='./data', background=train, download=True, transform=transform)
+    elif name == "SVHN":
+        train = "train" if train else "test"
+        d = torchvision.datasets.SVHN
+        return d(root='./data', split=train, download=True, transform=transform)
+    else:
+        raise NotImplementedError
+
+    return d(root='./data', train=train, download=True, transform=transform)
 
 def simulate(n, scenario):
     dataset = SimulatedDataset(n, scenario)
@@ -79,7 +134,7 @@ class SimulatedDataset(Dataset):
             eps = np.random.normal(loc=mean, scale=3, size=n)
             self.y = x[0] * (x[1] ** 2 + 1) + x[2] * x[3] + eps
         elif scenario == 4:  # Sparse case
-            p = 200
+            p = 1000
             x = np.random.uniform(-5, 5, size=(p, n))
             eps = np.random.normal(loc=mean, scale=2, size=n)
             beta_1 = np.zeros(p * 9 // 10)
@@ -88,7 +143,7 @@ class SimulatedDataset(Dataset):
             beta = np.random.permutation(beta)
             self.y = (np.einsum("ij, i -> j", x, beta) + eps)
         elif scenario == 5:  # Dense case
-            p = 200
+            p = 1000
             x = np.random.uniform(-5, 5, size=(p, n))
             eps = np.random.normal(loc=mean, scale=2, size=n)
             beta_1 = np.zeros(p // 10)
@@ -96,6 +151,14 @@ class SimulatedDataset(Dataset):
             beta = np.concatenate([beta_1, beta_2])
             beta = np.random.permutation(beta)
             self.y = (np.einsum("ij, i -> j", x, beta) + eps)
+        elif scenario == 6:  # Neural network case
+            p = 1000
+            net = MultipleLinear(1, p, 2)
+            x = np.random.uniform(-5, 5, size=(p, n)).astype(np.float32)
+            eps = np.random.normal(loc=mean, scale=2, size=n)
+
+            self.y = net(torch.from_numpy(x.T))
+            self.y = self.y.detach().numpy().squeeze() + eps
         else:
             raise NotImplementedError("This scenario is not implemented")
 

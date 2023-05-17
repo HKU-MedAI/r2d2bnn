@@ -13,7 +13,7 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2CNN_L2_CIFAR10/"
+  path: "./checkpoints/R2D2_v3_CNN_L2_CIFAR10/"
   save_checkpoint_freq: 2
 
 
@@ -37,8 +37,8 @@ train:
   r2d2_scale:
   prior_phi_prob: 0.6
   prior_psi_shape: 0.5
-  beta_rho_scale: [-3, 0.05]
-  bias_rho_scale: [-3, 0.05]
+  beta_rho_scale: [-4, 0.05]
+  bias_rho_scale: [-4, 0.05]
   weight_xi_shape: 0.3
   weight_omega_shape: 0.5
 

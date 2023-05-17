@@ -1,6 +1,7 @@
 import argparse
 import random
 
+import numpy as np
 import torch
 import yaml
 
@@ -19,6 +20,9 @@ from trainer import (
 )
 from utils import ordered_yaml
 
+import warnings
+warnings.filterwarnings('ignore')
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-config', type=str, help='Path to option YMAL file.', default="")
 parser.add_argument('-seed', type=int, help='random seed of the run', default=612)
@@ -26,7 +30,7 @@ parser.add_argument('-seed', type=int, help='random seed of the run', default=61
 args = parser.parse_args()
 
 opt_path = args.config
-default_config_path = "R2D2LeNet_CIFAR10.yml"
+default_config_path = "HorseshoeSimpleCNN_MNIST.yml"
 
 if opt_path == "":
     opt_path = CONFIG_DIR / default_config_path
@@ -42,13 +46,7 @@ torch.manual_seed(seed)
 mode = "train"
 
 
-def main():
-    # Load configurations
-    with open(opt_path, mode='r') as f:
-        loader, _ = ordered_yaml()
-        config = yaml.load(f, loader)
-        print(f"Loaded configs from {opt_path}")
-
+def parse_trainer(config):
     if mode == "train":
         if config["train_type"] == "bnn":
             trainer = BNNTrainer(config)
@@ -72,9 +70,38 @@ def main():
             trainer = BNNUncertaintyTrainer(config)
         else:
             raise NotImplementedError(f"Trainer of type {config['train_type']} is not implemented")
-        trainer.train()
     else:
         raise NotImplementedError("This mode is not implemented")
+
+    return trainer
+
+
+def benchmark_datasets(config):
+    in_datasets = ["CIFAR10"]
+    out_datasets = ["FashionMNIST", "OMNIGLOT", "SVHN"]
+
+    for in_data in in_datasets:
+        for out_data in out_datasets:
+            config["train"]["in_channel"] = 3
+
+            config["dataset"]["in"] = in_data
+            config["dataset"]["ood"] = out_data
+            config["checkpoints"]["path"] = f"./checkpoints/BLeNet_OOD_{in_data}_{out_data}"
+
+            trainer = parse_trainer(config)
+
+            trainer.train()
+
+
+def main():
+    # Load configurations
+    with open(opt_path, mode='r') as f:
+        loader, _ = ordered_yaml()
+        config = yaml.load(f, loader)
+        print(f"Loaded configs from {opt_path}")
+
+    trainer = parse_trainer(config)
+    trainer.train()
 
 
 if __name__ == "__main__":

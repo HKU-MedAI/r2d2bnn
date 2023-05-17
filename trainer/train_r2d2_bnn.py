@@ -17,8 +17,7 @@ from parse import (
     parse_bayesian_model
 )
 
-import torchvision.transforms as transforms
-import torchvision
+from matplotlib import pyplot as plt
 import torch
 
 
@@ -57,7 +56,7 @@ class R2D2BNNTrainer(Trainer):
         kl_loss = self.model.kl_loss()
         ce_loss = F.cross_entropy(pred, label, reduction='mean')
 
-        loss = ce_loss + kl_loss * self.beta
+        loss = ce_loss + kl_loss.item() * self.beta
         # loss = ce_loss
         loss.backward()
 
@@ -67,7 +66,7 @@ class R2D2BNNTrainer(Trainer):
 
         acc = utils.acc(pred.data, label)
 
-        return loss.item(), kl_loss, ce_loss.item(), acc, pred
+        return loss.item(), kl_loss.item(), ce_loss.item(), acc, pred
 
     def valid_one_step(self, data, label, beta):
 
@@ -81,11 +80,11 @@ class R2D2BNNTrainer(Trainer):
         # log_outputs = utils.logmeanexp(outputs, dim=2)
         pred = F.normalize(pred, 1)
         kl_loss = self.model.kl_loss()
-        loss, nll_loss, kl_loss = self.loss_fcn(pred, label, kl_loss, beta)
+        loss, nll_loss, _ = self.loss_fcn(pred, label, kl_loss.item(), beta)
 
         acc = utils.acc(pred.data, label)
 
-        return loss.item(), kl_loss, nll_loss.item(), acc, pred
+        return loss.item(), kl_loss.item(), nll_loss.item(), acc, pred
 
     def validate(self, epoch):
         valid_loss_list = []
@@ -127,6 +126,9 @@ class R2D2BNNTrainer(Trainer):
             acc_list = []
             probs = []
             labels = []
+
+            if epoch % 5 == 0:
+                self.visualize_map(epoch)
 
             for i, (data, label) in tqdm(enumerate(self.dataloader)):
                 label = label.to(self.device)
@@ -179,3 +181,50 @@ class R2D2BNNTrainer(Trainer):
 
                 # Remove previous checkpoints
                 self.checkpoint_manager.remove_old_version()
+
+    def visualize_map(self, epoch):
+        """
+        Visualize the convolutional map of the features
+        """
+
+        fig, ax = plt.subplots(4, 5, figsize=(36, 10))
+
+        pth = self.checkpoint_manager.path / "visualizations"
+        if not pth.exists():
+            pth.mkdir()
+
+        # layer = self.model.convs[0]
+        layer = self.model.conv1
+
+        # Sample maps here
+        beta = layer.beta_.sample(200)
+        beta_sigma = layer.beta_.std_dev.detach()
+        beta_eps = torch.empty(beta.size()).normal_(0, 1)
+        beta_std = torch.sqrt(beta_sigma ** 2 * layer.omega * layer.phi * layer.psi / 2)
+
+        epsilon = torch.distributions.Normal(0, 1).sample(sample_shape=beta.shape)
+        weight = layer.beta_.mean + beta_std * epsilon
+        weight = weight.detach().cpu().numpy().squeeze()
+        weight = weight.mean(0)
+        norms = np.linalg.norm(weight, axis=(1, 2))
+        max_indices = torch.from_numpy(norms).topk(5).indices
+        min_indices = (- torch.from_numpy(norms)).topk(5).indices
+
+        for i in range(5):
+            ax[0, i].imshow(weight[max_indices[i]], cmap='gray',  vmin=weight.min(), vmax=weight.max())
+            ax[1, i].imshow(weight[min_indices[i]], cmap='gray', vmin=weight.min(), vmax=weight.max())
+
+        d = self.dataloader.dataset[0][0].unsqueeze(0).cuda()
+        mp = self.model.get_map(d).squeeze().detach().cpu().numpy()
+        norms = np.linalg.norm(mp, axis=(1, 2))
+        max_indices = torch.from_numpy(norms).topk(5).indices
+        min_indices = (- torch.from_numpy(norms)).topk(5).indices
+
+        # fig, ax = plt.subplots()
+        for i in range(5):
+            ax[2, i].imshow(mp[max_indices[i]], cmap='gray')
+            ax[3, i].imshow(mp[min_indices[i]], cmap='gray')
+
+        plt.savefig(pth / f"MNIST_ep{epoch}.png")
+
+        return

@@ -11,7 +11,7 @@ from scipy.special import kn, kvp, gamma, digamma, loggamma
 from losses import calculate_kl, KLDivergence
 
 
-class R2D2LinearLayer(nn.Module):
+class R2D2CondLinearLayer(nn.Module):
     """
     Single linear layer of a R2D2 prior for regression
     """

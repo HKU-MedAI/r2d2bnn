@@ -7,13 +7,13 @@ gpu_ids: [2]
 
 #### datasets
 data:
-  name: "BDLB"
-  image_size: 256
-  train_path: None
+  image_size: 32
+  in: "CIFAR10"
+  ood: "FashionMNIST"
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2_OOD_MNIST_SVHN/"
+  path: "./checkpoints/R2D2LeNet_CIFAR_FashionMNIST_OOD/"
   save_checkpoint_freq: 2
 
 
@@ -27,7 +27,7 @@ optimizer:
 train:
   model_name: "R2D2LeNet"
 
-  num_epochs: 1000
+  num_epochs: 100
   batch_size: 64
   train_size: 1
 
@@ -43,7 +43,7 @@ train:
   weight_xi_shape: 0.3
   weight_omega_shape: 0.5
 
-  in_channels: 1
+  in_channels: 3
   out_channels: 10
 
   loss: "ELBO"

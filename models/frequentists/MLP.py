@@ -9,7 +9,7 @@ class MultipleLinear(nn.Module):
     and 3 FC layers with Bayesian layers.
     """
 
-    def __init__(self, outputs, inputs, n_blocks=3, layer_type="r2d2", activation_type='softplus'):
+    def __init__(self, outputs, inputs, n_blocks=3, activation_type='softplus'):
         super(MultipleLinear, self).__init__()
 
         self.num_classes = outputs
@@ -52,4 +52,6 @@ class MultipleLinear(nn.Module):
             x = self.dense_block[2 * l + 1](x)
             x = F.dropout(x, p)
         x = self.dense_block[-1](x)
+        if self.n_blocks==0:
+            x = F.dropout(x, p)
         return x

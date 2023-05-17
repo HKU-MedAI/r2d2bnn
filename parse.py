@@ -13,11 +13,13 @@ from models import (
     BBBHorseshoeLeNet,
     BBBR2D2LeNet,
     BBBR2D2AlexNet,
-    BBBR2D2CNN,
+    R2D2CNN,
     R2D2MultipleLinear,
     ResNet,
     CNN,
-    MultipleLinear
+    MultipleLinear,
+    R2D2SimpleCNN,
+    BBBHorseshoeSimpleCNN
 )
 from models.frequentists import LeNet, EfficientNetB4, AlexNet
 from torchvision.models import resnet18, resnet50
@@ -96,7 +98,7 @@ def parse_bayesian_model(config_train, image_size=32):
             'posterior_mu_initial': config_train["posterior_mu_initial"],
             'posterior_rho_initial': config_train["posterior_rho_initial"],
         }
-    elif model_name in ["HorseshoeLeNet", "BHorseshoeAlexNet", "HorseshoeCNN", "HorseshoeMLP"]:
+    elif model_name in ["HorseshoeLeNet", "BHorseshoeAlexNet", "HorseshoeCNN", "HorseshoeMLP", "HorseshoeSimpleCNN"]:
         priors = {
             "horseshoe_scale": config_train["horseshoe_scale"],
             "global_cauchy_scale": config_train["global_cauchy_scale"],
@@ -108,7 +110,7 @@ def parse_bayesian_model(config_train, image_size=32):
             "log_v_mean": config_train["log_v_mean"],
             "log_v_rho_scale": config_train["log_v_rho_scale"]
         }
-    elif model_name in ["R2D2AlexNet", "R2D2LeNet", "R2D2CNN", "R2D2MLP"]:
+    elif model_name in ["R2D2AlexNet", "R2D2LeNet", "R2D2CNN", "R2D2SimpleCNN", "R2D2MLP"]:
         priors = {
             "r2d2_scale": config_train["r2d2_scale"],
             "prior_phi_prob": config_train["prior_phi_prob"],
@@ -159,6 +161,12 @@ def parse_bayesian_model(config_train, image_size=32):
             priors=priors,
             n_blocks=n_blocks
         )
+    elif model_name == "HorseshoeSimpleCNN":
+        return BBBHorseshoeSimpleCNN(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors
+        )
     elif model_name == "HorseshoeMLP":
         n_blocks = config_train["n_blocks"]
         return HorseshoeMultipleLinear(
@@ -169,7 +177,7 @@ def parse_bayesian_model(config_train, image_size=32):
         )
     elif model_name == "R2D2CNN":
         n_blocks = config_train["n_blocks"]
-        return BBBR2D2CNN(
+        return R2D2CNN(
             outputs=out_dim,
             inputs=in_dim,
             priors=priors,
@@ -184,6 +192,12 @@ def parse_bayesian_model(config_train, image_size=32):
         )
     elif model_name == "R2D2AlexNet":
         return BBBR2D2AlexNet(
+            outputs=out_dim,
+            inputs=in_dim,
+            priors=priors
+        )
+    elif model_name == "R2D2SimpleCNN":
+        return R2D2SimpleCNN(
             outputs=out_dim,
             inputs=in_dim,
             priors=priors

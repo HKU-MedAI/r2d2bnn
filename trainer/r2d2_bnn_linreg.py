@@ -46,7 +46,7 @@ class R2D2LinearRegTrainer(Trainer):
         kl_loss = self.model.kl_loss()
 
         mse_loss = ((pred.squeeze() - label) ** 2).mean()
-        loss = mse_loss + kl_loss.item() * self.beta
+        loss = mse_loss + kl_loss * self.beta
 
         loss.backward()
 
@@ -54,7 +54,7 @@ class R2D2LinearRegTrainer(Trainer):
 
         self.model.analytic_update()
 
-        return loss.item(), mse_loss.item(), kl_loss.item(), label
+        return loss.item(), mse_loss.item(), kl_loss, label
 
     def valid_one_step(self, data, label):
 
@@ -64,11 +64,11 @@ class R2D2LinearRegTrainer(Trainer):
 
         mse_loss = ((pred.mean(0).squeeze() - label) ** 2).mean()
 
-        loss = mse_loss + kl_loss.item() * self.beta
+        loss = mse_loss + kl_loss * self.beta
 
         loss.backward()
 
-        return loss.item(), mse_loss.item(), kl_loss.item(), label, pred, pred_var
+        return loss.item(), mse_loss.item(), kl_loss, label, pred, pred_var
 
     def validate(self, epoch):
         valid_loss_list = []

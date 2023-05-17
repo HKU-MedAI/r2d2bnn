@@ -9,6 +9,7 @@ from torch.nn import functional as F
 
 from .trainer import Trainer
 import utils
+from data import load_uncertainty_data
 
 from parse import (
     parse_loss,
@@ -28,42 +29,23 @@ class BNNUncertaintyTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
 
-        train_in = torchvision.datasets.MNIST('./data/', train=True, download=True,
-                                              transform=torchvision.transforms.Compose(
-                                                  [torchvision.transforms.ToTensor(),
-                                                   torchvision.transforms.Normalize(
-                                                       (0.1307,), (0.3081,)),
-                                                   ]))
+        in_data_name = self.config_data["in"]
+        ood_data_name = self.config_data["ood"]
+        image_size = self.config_data["image_size"]
+        in_channel = self.config_train["in_channels"]
 
-        test_in = torchvision.datasets.MNIST('./data/', train=False, download=True,
-                                             transform=torchvision.transforms.Compose(
-                                                 [torchvision.transforms.ToTensor(),
-                                                  torchvision.transforms.Normalize(
-                                                      (0.1307,), (0.3081,)),
-                                                  ]))
-        train_out = torchvision.datasets.FashionMNIST('./data/', train=True, download=True,
-                                                      transform=torchvision.transforms.Compose(
-                                                          [torchvision.transforms.ToTensor(),
-                                                           torchvision.transforms.Normalize(
-                                                               (0.1307,), (0.3081,))]))
-        test_out = torchvision.datasets.FashionMNIST('./data/', train=False, download=True,
-                                                     transform=torchvision.transforms.Compose(
-                                                         [torchvision.transforms.ToTensor(),
-                                                          torchvision.transforms.Normalize(
-                                                              (0.1307,), (0.3081,))]))
+        train_in = load_uncertainty_data(in_data_name, True, image_size, in_channel)
+        test_in = load_uncertainty_data(in_data_name, False, image_size, in_channel)
+        train_out = load_uncertainty_data(ood_data_name, True, image_size, in_channel)
+        test_out = load_uncertainty_data(ood_data_name, False, image_size, in_channel)
 
-        train_out.targets = torch.tensor(np.ones(len(train_out.targets)) * 10, dtype=torch.long)
 
-        train_all = train_in
-        train_all.data = torch.cat((train_in.data, train_out.data))
-        train_all.targets = torch.cat((train_in.targets, train_out.targets))
-
-        self.train_all_loader = DataLoader(train_all, batch_size=self.batch_size, shuffle=True)
+        self.train_in_loader = DataLoader(train_in, batch_size=self.batch_size, shuffle=True)
         self.test_in_loader = DataLoader(test_in, batch_size=self.batch_size, shuffle=True)
         self.test_out_loader = DataLoader(test_out, batch_size=self.batch_size, shuffle=True)
 
         self.n_samples = self.config_train["n_samples"]
-        self.model = parse_bayesian_model(self.config_train, image_size=28)
+        self.model = parse_bayesian_model(self.config_train, image_size=image_size)
         self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
         self.loss_fcn = parse_loss(self.config_train)
@@ -210,7 +192,7 @@ class BNNUncertaintyTrainer(Trainer):
             probs = []
             labels = []
 
-            for i, (data, label) in enumerate(self.train_all_loader):
+            for i, (data, label) in enumerate(self.train_in_loader):
                 data = data.to(self.device)
                 data = data.permute(0, 3, 1, 2)
                 label = label.to(self.device)

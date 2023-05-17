@@ -1,6 +1,7 @@
 import argparse
 import random
 
+import numpy as np
 import torch
 import yaml
 
@@ -19,6 +20,9 @@ from trainer import (
 )
 from utils import ordered_yaml
 
+import warnings
+warnings.filterwarnings('ignore')
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-config', type=str, help='Path to option YMAL file.', default="")
 parser.add_argument('-seed', type=int, help='random seed of the run', default=612)
@@ -26,7 +30,7 @@ parser.add_argument('-seed', type=int, help='random seed of the run', default=61
 args = parser.parse_args()
 
 opt_path = args.config
-default_config_path = "R2D2MLP_Simulation.yml"
+default_config_path = "HorseshoeLeNet_MNISTOOD.yml"
 
 if opt_path == "":
     opt_path = CONFIG_DIR / default_config_path
@@ -42,7 +46,6 @@ torch.manual_seed(seed)
 mode = "train"
 
 def parse_trainer(config):
-
     if mode == "train":
         if config["train_type"] == "bnn":
             trainer = BNNTrainer(config)
@@ -66,75 +69,38 @@ def parse_trainer(config):
             trainer = BNNUncertaintyTrainer(config)
         else:
             raise NotImplementedError(f"Trainer of type {config['train_type']} is not implemented")
-        return trainer
     else:
         raise NotImplementedError("This mode is not implemented")
 
-def simulate_baselines(config):
-    name = config["name"]
-    for seed in range(5):
-        st = hash(seed)
-        random.seed(st)
-        torch.manual_seed(st)
-        for s in range(1, 7):
-            for l in range(4):
+    return trainer
 
-                config["train"]["n_blocks"] = l
-                config["data"]["scenario"] = s
-                config["checkpoints"]["path"] = f"./checkpoints/Simulations/{name}/{name}MLP_L{l}_S{s}/"
+def benchmark_datasets(config):
+    in_datasets = ["CIFAR10"]
+    out_datasets = ["FashionMNIST", "Omiglot", "SVHN"]
 
-                # Parse channels
-                if s == 1:
-                    config["train"]["in_channels"] = 1
-                elif s == 2 or s == 3:
-                    config["train"]["in_channels"] = 4
-                else:
-                    config["train"]["in_channels"] = 1000
+    for in_data in in_datasets:
+        for out_data in out_datasets:
+            config["train"]["in_channel"] = 3
 
-                trainer = parse_trainer(config=config)
-                trainer.train()
+            config["data"]["in"] = in_data
+            config["data"]["ood"] = out_data
+            config["checkpoints"]["path"] = f"./checkpoints/HorseshoeLeNet_OOD_{in_data}_{out_data}"
 
-                with open(f"./checkpoints/Simulations/{name}/summary_seed{seed}.txt", "a") as f:
-                    f.write(f"L: {l}, S: {s}" + str(trainer.checkpoint_manager.stats) + "\n")
+            trainer = parse_trainer(config)
+            trainer.train()
 
+def benchmark_CNN(config):
+    pass
 
-def simulate_hyperparameters(config):
-    name = config["name"]
-    for b in [0.1, 0.2, 0.3, 0.4, 0.5]:
-        for s in range(1, 7):
-            for l in range(4):
-
-                config["train"]["n_blocks"] = l
-                config["data"]["scenario"] = s
-                config["checkpoints"]["path"] = f"./checkpoints/Simulations_b/{name}/{name}MLP_L{l}_S{s}/"
-                # # config["train"]["prior_phi_prob"] = alpha
-                # config["train"]["beta_rho_scale"] = [rho, 0.05]
-                # config["train"]["bias_rho_scale"] = [rho, 0.05]
-                config["train"]["weight_omega_shape"] = b
-
-                # Parse channels
-                if s == 1:
-                    config["train"]["in_channels"] = 1
-                elif s == 2 or s == 3:
-                    config["train"]["in_channels"] = 4
-                else:
-                    config["train"]["in_channels"] = 1000
-
-                trainer = parse_trainer(config=config)
-                trainer.train()
-
-                with open(f"./checkpoints/Simulations_alpha/{name}/summary_b{b}.txt", "a") as f:
-                    f.write(f"L: {l}, S: {s}" + str(trainer.checkpoint_manager.stats) + "\n")
 
 def main():
-
     # Load configurations
     with open(opt_path, mode='r') as f:
         loader, _ = ordered_yaml()
         config = yaml.load(f, loader)
         print(f"Loaded configs from {opt_path}")
 
-    simulate_hyperparameters(config)
+    benchmark_datasets(config)
 
 
 if __name__ == "__main__":

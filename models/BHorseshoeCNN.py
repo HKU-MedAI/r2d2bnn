@@ -54,11 +54,7 @@ class BBBHorseshoeCNN(nn.Module):
 
         self.dense_block = nn.Sequential(
             FlattenLayer(out_size * out_size * out_channels),
-            HorseshoeLinearLayer(out_size * out_size * out_channels, 1000, self.priors),
-            self.act(),
-            HorseshoeLinearLayer(1000, 1000, self.priors),
-            self.act(),
-            HorseshoeLinearLayer(1000, outputs, self.priors),
+            HorseshoeLinearLayer(out_size * out_size * out_channels, outputs, self.priors),
         )
 
     def log_prior(self):

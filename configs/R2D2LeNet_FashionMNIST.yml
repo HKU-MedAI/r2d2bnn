@@ -1,19 +1,19 @@
 #### general settings
 name: BPN
-train_type: bnn-uncertainty
+train_type: bnn-r2d2
 eval_type: bnn
 gpu_ids: [2]
 
 
 #### datasets
 data:
-  name: "BDLB"
-  image_size: 256
+  name: "FashionMNIST"
+  image_size: 32
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2_OOD_MNIST_SVHN/"
+  path: "./checkpoints/R2D2LeNet_v2_FashionMNIST/"
   save_checkpoint_freq: 2
 
 
@@ -27,19 +27,17 @@ optimizer:
 train:
   model_name: "R2D2LeNet"
 
-  num_epochs: 1000
-  batch_size: 64
+  num_epochs: 2000
+  batch_size: 1024
   train_size: 1
 
-  n_samples: 10
-
-  beta: 0.005
+  beta: 0.00001
 
   r2d2_scale:
   prior_phi_prob: 0.6
   prior_psi_shape: 0.5
-  beta_rho_scale: [-2.5, 0.05]
-  bias_rho_scale: [-2.5, 0.05]
+  beta_rho_scale: [-5, 0.1]
+  bias_rho_scale: [-5, 0.1]
   weight_xi_shape: 0.3
   weight_omega_shape: 0.5
 

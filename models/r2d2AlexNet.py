@@ -99,3 +99,6 @@ class BBBR2D2AlexNet(nn.Module):
                 kl += module.kl_loss()
 
         return kl
+
+    def get_map(self, x):
+        pass

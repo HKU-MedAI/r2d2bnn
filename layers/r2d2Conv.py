@@ -125,18 +125,12 @@ class R2D2ConvLayer(nn.Module):
             sample: bool, whether to samples weights and bias
             n_samples: int, number of samples to draw from the weight and bias distribution
         """
-
-        # Compute variance parameter
-        # It is phi_j and psi_j for local shrinkage
-        beta = self.beta_.sample(n_samples).mean(0)
+        beta = self.beta_.sample(n_samples)
         beta_sigma = self.beta_.std_dev.detach()
         beta_eps = torch.empty(beta.size()).normal_(0, 1)
         beta_std = torch.sqrt(beta_sigma ** 2 * self.omega * self.phi * self.psi / 2)
-
-        if self.training:
-            weight = beta + beta_std * beta_eps
-        else:
-            weight = beta + beta_std
+        weight = self.beta_.mean + beta_std * beta_eps
+        weight = weight.mean(0)
 
         bias = self.bias.sample(n_samples).mean(0)
 
@@ -277,4 +271,4 @@ class R2D2ConvLayer(nn.Module):
         #Compute KL divergences of phi
         kl_phi = KLDivergence()(phi_post, phi_prior).item()
 
-        return (kl_beta_sigma + kl_omega + kl_phi + kl_xi + kl_psi).item()
+        return kl_beta_sigma + kl_omega + kl_phi + kl_xi + kl_psi

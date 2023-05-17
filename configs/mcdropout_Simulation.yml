@@ -9,10 +9,11 @@ gpu_ids: [2]
 data:
   name: "simulated"
   n: 10000
+  scenario: 1
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/MCDropout_L1/"
+  path: "./checkpoints/MCDropout_L3_S1/"
   save_checkpoint_freq: 5
 
 

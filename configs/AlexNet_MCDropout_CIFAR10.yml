@@ -1,5 +1,5 @@
 #### general settings
-name: BPN
+name: MCDropout
 train_type: cnn-mc
 eval_type: cnn-mc
 gpu_ids: [2]
