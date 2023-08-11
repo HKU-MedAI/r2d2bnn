@@ -26,9 +26,11 @@ class BNNTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
 
-        self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size)
+        self.initialize_logger()
 
-        self.model = parse_bayesian_model(self.config_train).to(self.device)
+        self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size, self.config_data["image_size"])
+
+        self.model = parse_bayesian_model(self.config_model).to(self.device)
         self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
         self.loss_fcn = parse_loss(self.config_train)
@@ -41,7 +43,7 @@ class BNNTrainer(Trainer):
     def train_one_step(self, data, label, beta):
         self.optimzer.zero_grad()
 
-        outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
+        outputs = torch.zeros(data.shape[0], self.config_model["out_channels"], 1).to(self.device)
 
         pred = self.model(data)
         kl_loss = self.model.kl_loss()
@@ -55,16 +57,15 @@ class BNNTrainer(Trainer):
 
         self.optimzer.step()
 
-        acc = utils.acc(log_outputs.data, label)
-
-        return loss.item(), kl_loss.item(), nll_loss.item(), acc, log_outputs, label
+        return loss.item(), kl_loss.item(), nll_loss.item(), log_outputs
 
     def valid_one_step(self, data, label, beta):
 
-        outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
+        outputs = torch.zeros(data.shape[0], self.config_model["out_channels"], 1).to(self.device)
 
-        pred = self.model(data)
-        kl_loss = self.model.kl_loss()
+        with torch.no_grad():
+            pred = self.model(data)
+            kl_loss = self.model.kl_loss()
 
         outputs[:, :, 0] = F.log_softmax(pred, dim=1)
 
@@ -72,15 +73,12 @@ class BNNTrainer(Trainer):
 
         loss, nll_loss, kl_loss = self.loss_fcn(log_outputs, label, kl_loss, beta)
 
-        acc = utils.acc(log_outputs.data, label)
-
-        return loss.item(), kl_loss.item(), nll_loss.item(), acc, log_outputs, label
+        return loss.item(), kl_loss.item(), nll_loss.item(), log_outputs
 
     def validate(self, epoch):
         valid_loss_list = []
         valid_kl_list = []
         valid_nll_list = []
-        valid_acc_list = []
         probs = []
         preds = []
         labels = []
@@ -89,24 +87,22 @@ class BNNTrainer(Trainer):
             (data, label) = (data.to(self.device), label.to(self.device))
             # beta = utils.get_beta(i - 1, len(self.valid_loader), "Standard", epoch, self.n_epoch)
             beta = self.beta
-            res, kl, nll, acc, log_outputs, label = self.valid_one_step(data, label, beta)
+            res, kl, nll, log_outputs = self.valid_one_step(data, label, beta)
 
-            probs.append(log_outputs.softmax(1).detach().cpu().numpy())
-            preds.append(log_outputs.detach().cpu().numpy().argmax(axis=1))
-            labels.append(label.detach().cpu().numpy())
+            probs.append(log_outputs)
+            preds.append(log_outputs)
+            labels.append(label)
 
             valid_loss_list.append(res)
             valid_kl_list.append(kl)
             valid_nll_list.append(nll)
-            valid_acc_list.append(acc)
 
-        valid_loss, valid_acc, valid_kl, valid_nll = np.mean(valid_loss_list), np.mean(valid_acc_list), np.mean(valid_kl_list), np.mean(valid_nll_list)
-        probs = np.concatenate(probs)
-        preds = np.concatenate(preds)
-        labels = np.concatenate(labels)
-        precision, recall, f1, aucroc = utils.metrics(probs, labels, average="weighted")
+        probs = torch.cat(probs)
+        labels = torch.cat(labels)
 
-        return valid_loss, valid_acc, valid_kl, valid_nll, precision, recall, f1, aucroc
+        test_metrics = utils.metrics(probs, labels, prefix="te")
+
+        return test_metrics
 
     def train(self) -> None:
         print(f"Start training BNN...")
@@ -116,7 +112,6 @@ class BNNTrainer(Trainer):
             training_loss_list = []
             kl_list = []
             nll_list = []
-            acc_list = []
             probs = []
             labels = []
 
@@ -125,43 +120,42 @@ class BNNTrainer(Trainer):
             for i, (data, label) in enumerate(self.dataloader):
                 (data, label) = (data.to(self.device), label.to(self.device))
 
-                res, kl, nll, acc, log_outputs, label = self.train_one_step(data, label, beta)
+                res, kl, nll, log_outputs = self.train_one_step(data, label, beta)
 
                 training_loss_list.append(res)
                 kl_list.append(kl)
                 nll_list.append(nll)
-                acc_list.append(acc)
 
-                probs.append(log_outputs.softmax(1).detach().cpu().numpy())
-                labels.append(label.detach().cpu().numpy())
+                probs.append(log_outputs)
+                labels.append(label)
 
-            train_loss, train_acc, train_kl, train_nll = np.mean(training_loss_list), np.mean(acc_list), np.mean(
-                kl_list), np.mean(nll_list)
-            probs = np.concatenate(probs)
-            labels = np.concatenate(labels)
-            train_precision, train_recall, train_f1, train_aucroc = utils.metrics(probs, labels, average="weighted")
+            probs = torch.cat(probs)
+            labels = torch.cat(labels)
+            train_metrics = utils.metrics(probs, labels)
 
-            valid_loss, valid_acc, valid_kl, valid_nll, val_precision, val_recall, val_f1, val_aucroc = self.validate(epoch)
+            test_metrics = self.validate(epoch)
 
-            training_range.set_description('Epoch: {} \tTraining Loss: {:.4f} \tTraining Accuracy: {:.4f} \tValidation Loss: {:.4f} \tValidation Accuracy: {:.4f} \tTrain_kl_div: {:.4f} \tTrain_nll: {:.4f}'.format(
-                    epoch, train_loss, train_acc, valid_loss, valid_acc, train_kl, train_nll))
+            loss_dict = {
+                "loss_tot": np.mean(training_loss_list),
+                "loss_kl": np.mean(kl_list),
+                "loss_ce": np.mean(nll_list)
+            }
+
+            self.logging(epoch, loss_dict, train_metrics, test_metrics)
+
+            training_range.set_description(
+                'Epoch: {} \tTr Loss: {:.4f} \tTr Acc: {:.4f} \tVal Acc: {:.4f} \tTr Kl Div: {:.4f} \tTr NLL: {:.4f}'.format(
+                    epoch, loss_dict["loss_tot"], train_metrics["tr_accuracy"],
+                    test_metrics["te_accuracy"], loss_dict["loss_kl"], loss_dict["loss_ce"]))
 
             # Update new checkpoints and remove old ones
             if self.save_steps and (epoch + 1) % self.save_steps == 0:
                 epoch_stats = {
                     "Epoch": epoch + 1,
-                    "Train Loss": train_loss,
-                    "Train NLL Loss": train_nll,
-                    "Train KL Loss": train_kl,
-                    "Train Accuracy": train_acc,
-                    "Train F1": train_f1,
-                    "Train AUC": train_aucroc,
-                    "Validation Loss": valid_loss,
-                    "Validation KL Loss": valid_kl,
-                    "Validation Accuracy": valid_acc,
-                    "Validation F1": val_f1,
-                    "Validation AUC": val_aucroc
                 }
+                epoch_stats.update(loss_dict)
+                epoch_stats.update(train_metrics)
+                epoch_stats.update(test_metrics)
 
                 # State dict of the model including embeddings
                 self.checkpoint_manager.write_new_version(

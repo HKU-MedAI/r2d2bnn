@@ -264,91 +264,6 @@ def gigrnd2(p, a, b):
     return rnd
 
 
-# def gigrnd(p, a, b):
-#     # setup -- sample from the two-parameter version gig(lam,omega)
-#     lam = p
-#     omega = math.sqrt(a * b)
-#
-#     if lam < 0:
-#         lam = -lam
-#         swap = True
-#     else:
-#         swap = False
-#
-#     alpha = math.sqrt(math.pow(omega, 2) + math.pow(lam, 2)) - lam
-#
-#     # find t
-#     x = -psi(1.0, alpha, lam)
-#     if (x >= 0.5) and (x <= 2.0):
-#         t = 1.0
-#     elif x > 2.0:
-#         if (alpha == 0) and (lam == 0):
-#             t = 1.0
-#         else:
-#             t = math.sqrt(2.0 / (alpha + lam))
-#     elif x < 0.5:
-#         if (alpha == 0) and (lam == 0):
-#             t = 1.0
-#         else:
-#             t = math.log(4.0 / (alpha + 2.0 * lam))
-#
-#     # find s
-#     x = -psi(-1.0, alpha, lam)
-#     if (x >= 0.5) and (x <= 2.0):
-#         s = 1.0
-#     elif x > 2.0:
-#         if (alpha == 0) and (lam == 0):
-#             s = 1.0
-#         else:
-#             s = math.sqrt(4.0 / (alpha * math.cosh(1) + lam))
-#     elif x < 0.5:
-#         if (alpha == 0) and (lam == 0):
-#             s = 1.0
-#         elif alpha == 0:
-#             s = 1.0 / lam
-#         elif lam == 0:
-#             s = math.log(1.0 + 1.0 / alpha + math.sqrt(1.0 / math.pow(alpha, 2) + 2.0 / alpha))
-#         else:
-#             s = min(1.0 / lam, math.log(1.0 + 1.0 / alpha + math.sqrt(1.0 / math.pow(alpha, 2) + 2.0 / alpha)))
-#
-#     # find auxiliary parameters
-#     eta = -psi(t, alpha, lam)
-#     zeta = -dpsi(t, alpha, lam)
-#     theta = -psi(-s, alpha, lam)
-#     xi = dpsi(-s, alpha, lam)
-#
-#     p = 1.0 / xi
-#     r = 1.0 / zeta
-#
-#     td = t - r * eta
-#     sd = s - p * theta
-#     q = td + sd
-#
-#     # random variate generation
-#     while True:
-#         U = random.random()
-#         V = random.random()
-#         W = random.random()
-#         if U < q / (p + q + r):
-#             rnd = -sd + q * V
-#         elif U < (q + r) / (p + q + r):
-#             rnd = td - r * math.log(V)
-#         else:
-#             rnd = -sd + p * math.log(V)
-#
-#         f1 = math.exp(-eta - zeta * (rnd - t))
-#         f2 = math.exp(-theta + xi * (rnd + s))
-#         if W * g(rnd, sd, td, f1, f2) <= math.exp(psi(rnd, alpha, lam)):
-#             break
-#
-#     # transform back to the three-parameter version gig(p,a,b)
-#     rnd = math.exp(rnd) * (lam / omega + math.sqrt(1.0 + math.pow(lam, 2) / math.pow(omega, 2)))
-#     if swap:
-#         rnd = 1.0 / rnd
-#
-#     rnd = rnd / math.sqrt(a / b)
-#     return rnd
-
 class ReparametrizedGaussian(Distribution):
     """
     Diagonal ReparametrizedGaussian distribution with parameters mu (mean) and rho. The standard
@@ -397,6 +312,30 @@ class ReparametrizedGaussian(Distribution):
         part2 = torch.sum(torch.log(self.std_dev))
 
         return part1 + part2
+
+
+class ReparameterizedMultivariateGaussian(Distribution):
+    """
+    Diagonal ReparametrizedGaussian distribution with parameters mu (mean) and rho. The standard
+    deviation is parametrized as sigma = log(1 + exp(rho))
+    A sample from the distribution can be obtained by sampling from a unit Gaussian,
+    shifting the samples by the mean and scaling by the standard deviation:
+    w = mu + log(1 + exp(rho)) * epsilon
+    """
+
+    def __init__(self, mu, rho):
+        self.mean = mu
+        self.rho = rho
+        self.normal = torch.distributions.Normal(0, 1)
+        self.point_estimate = self.mean
+
+    @property
+    def std_dev(self):
+        return torch.log1p(torch.exp(self.rho))
+
+    def sample(self, n_samples=1):
+        epsilon = torch.distributions.Normal(0, 1).sample(sample_shape=(n_samples, *self.mean.size()))
+        return self.mean + self.std_dev * epsilon
 
 
 class ScaleMixtureGaussian(Distribution):
@@ -554,6 +493,50 @@ class Gamma(Distribution):
         self.mean = shape / rate
         self.variance = shape / rate ** 2
 
+class Beta(Distribution):
+    """ Beta distribution """
+
+    def __init__(self, shape_1, shape_2):
+        """
+        Class constructor, sets parameters
+        Args:
+            shape: float, shape parameter of the distribution
+            rate: float, rate parameter of the distribution
+        Raises:
+            TypeError: if given rate or shape are not floats
+            ValueError: if given rate or shape are not positive
+        """
+
+        if shape_1 <= 0 or shape_2 <= 0:
+            raise ValueError("Shape and rate must be positive!")
+
+        self.shape_1 = shape_1
+        self.shape_2 = shape_2
+        self.mean = self.shape_1 / (self.shape_1 + self.shape_2)
+        self.variance = (shape_1 * shape_2) / ((shape_1 + shape_2) ** 2 * (shape_1 + shape_2 + 1))
+        self.point_estimate = self.mean
+
+    def sample(self, n_samples=1):
+        s = torch.distributions.Beta(self.shape_2, self.shape_1).sample(sample_shape=(n_samples, *self.shape_2.size()))
+        return s
+
+    def update(self, shape_1, shape_2):
+        """
+        Updates mean and variance automatically when a and b get updated
+        Args:
+            shape: float, shape parameter of the distribution
+            rate: float, rate parameter of the distribution
+        Raises:
+            ValueError: if given rate or shape are not positive
+        """
+        if shape_1 <= 0 or shape_2 <= 0:
+            raise ValueError("Shape and rate must be positive!")
+
+        self.shape_1 = shape_1
+        self.shape_2 = shape_2
+        self.mean = self.shape_1 / (self.shape_1 + self.shape_2)
+        self.variance = (shape_1 * shape_2) / ((shape_1 + shape_2) ** 2 * (shape_1 + shape_2 + 1))
+
 
 class InvGaussian(Distribution):
     """
@@ -641,6 +624,11 @@ class InverseGamma(Distribution):
         """
         self.shape = shape
         self.rate = rate
+
+    def sample(self, n_samples=1):
+        s = torch.distributions.Gamma(self.rate, self.shape).sample(sample_shape=(n_samples, *self.rate.size()))
+        s = 1 / s
+        return s
 
     def exp_inverse(self):
         """

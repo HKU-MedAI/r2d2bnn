@@ -237,8 +237,8 @@ class R2D2ConvLayer(nn.Module):
         p, a, b = self.omega_gib.lamb, \
                   self.omega_gib.rho.detach().numpy(), \
                   self.omega_gib.chi.detach().numpy()
-        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-5
-        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-5
+        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-3
+        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-3
         bessel_ratio = 1 if np.isnan(bassel_plus / bassel) else bassel_plus / bassel
 
         log_omega_exp = log_expect_gig(p, a, b)
@@ -253,8 +253,8 @@ class R2D2ConvLayer(nn.Module):
                   self.psi_gib.rho.detach().numpy(), \
                   self.psi_gib.chi.detach().numpy()
         mu = np.sqrt(1 / a)
-        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-5
-        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-5
+        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-4
+        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-4
         bessel_ratio = 1 if np.isnan(bassel_plus / bassel).any() else bassel_plus / bassel
 
         log_psi_exp = log_expect_gig(p, a, b)

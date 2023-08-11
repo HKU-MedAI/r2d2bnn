@@ -23,9 +23,20 @@ optimizer:
   lr: 0.0005  # Learning rate
   weight_decay: 0.000001
 
+model:
+  name: "R2D2LeNet"
+
+  r2d2_scale:
+  prior_phi_prob: 0.6
+  prior_psi_shape: 0.5
+  beta_rho_scale: [ -4, 0.1 ]
+  bias_rho_scale: [ -4, 0.1 ]
+  weight_xi_shape: 0.3
+  weight_omega_shape: 0.5
+
+
 #### training settings: learning rate scheme, loss, optimizer
 train:
-  model_name: "R2D2LeNet"
 
   num_epochs: 2000
   batch_size: 1024
@@ -33,15 +44,18 @@ train:
 
   beta: 0.00001
 
-  r2d2_scale:
-  prior_phi_prob: 0.6
-  prior_psi_shape: 0.5
-  beta_rho_scale: [-4, 0.1]
-  bias_rho_scale: [-4, 0.1]
-  weight_xi_shape: 0.3
-  weight_omega_shape: 0.5
-
   in_channels: 3
   out_channels: 100
 
   loss: "ELBO"
+
+#### Logging
+logging:
+  mode: online # disabled
+  tags: [
+      "CIFAR100",
+      "Classification",
+      "LeNet",
+      "R2D2",
+      "Marginal",
+    ]

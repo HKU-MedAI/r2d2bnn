@@ -7,15 +7,19 @@ gpu_ids: [2]
 
 #### datasets
 data:
-  name: "CIFAR100"
+  name: "ImageNet"
   image_size: 32
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/LeNet_CIFAR100/"
+  path: "./checkpoints/LeNet_ImageNet/"
   save_checkpoint_freq: 2
 
+model:
+  name: "LeNet"
+  in_channels: 3
+  out_channels: 200
 
 #### Optimizer settings
 optimizer:
@@ -25,14 +29,18 @@ optimizer:
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
-  model_name: "LeNet"
 
   num_epochs: 1000
   batch_size: 128
   train_size: 1
 
-  in_channels: 3
-  out_channels: 100
-
   loss: "CE"
 
+logging:
+  mode: online # disabled
+  tags: [
+      "ImageNet",
+      "Classification",
+      "LeNet",
+      "Frequentist",
+    ]

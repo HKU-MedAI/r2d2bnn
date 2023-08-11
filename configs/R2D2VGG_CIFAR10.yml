@@ -13,46 +13,50 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2_v3_AlexNet_CIFAR10_f2/"
+  path: "./checkpoints/R2D2_VGG_CIFAR10/"
   save_checkpoint_freq: 2
+
 
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.0005  # Learning rate
-  weight_decay: 0.0001
+  lr: 0.001  # Learning rate
+  weight_decay: 0.001
 
-#### training settings: learning rate scheme, loss, optimizer
-train:
-  model_name: "R2D2AlexNet"
+model:
+  name: "VGG"
+  layer_type: r2d2_marginal
 
-  num_epochs: 2000
-  batch_size: 1024
-  train_size: 1
-
-  beta: 0.00001
-
-  r2d2_scale:
-  prior_phi_prob: 0.6
-  prior_psi_shape: 0.5
-  beta_rho_scale: [-3, 0.3]
-  bias_rho_scale: [-3, 0.3]
-
-  weight_xi_shape: 0.3
-  weight_omega_shape: 0.5
+  prior:
+    r2d2_scale:
+    prior_phi_prob: 0.6
+    prior_psi_shape: 0.5
+    beta_rho_scale: [-4.5, 0.1]
+    bias_rho_scale: [-4.5, 0.1]
+    weight_xi_shape: 0.3
+    weight_omega_shape: 0.5
 
   in_channels: 3
   out_channels: 10
+
+#### training settings: learning rate scheme, loss, optimizer
+train:
+
+  num_epochs: 2000
+  batch_size: 64
+  train_size: 1
+
+  beta: 0.001
 
   loss: "ELBO"
 
 #### Logging
 logging:
-  mode: online # disabled
+  mode: disabled # disabled
   tags: [
       "CIFAR10",
-      "AlexNet",
+      "Classification",
+      "VGG",
       "R2D2",
       "Marginal",
     ]
-

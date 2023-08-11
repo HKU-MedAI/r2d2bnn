@@ -23,13 +23,16 @@ import torch
 
 from matplotlib import pyplot as plt
 
+
 class BNNHorseshoeTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
 
+        self.initialize_logger()
+
         self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size)
 
-        self.model = parse_bayesian_model(self.config_train)
+        self.model = parse_bayesian_model(self.config_model)
         self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
         self.loss_fcn = parse_loss(self.config_train)
@@ -42,7 +45,7 @@ class BNNHorseshoeTrainer(Trainer):
     def train_one_step(self, data, label, beta):
         self.optimzer.zero_grad()
 
-        outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
+        outputs = torch.zeros(data.shape[0], self.config_model["out_channels"], 1).to(self.device)
 
         pred = self.model(data)
 
@@ -61,13 +64,11 @@ class BNNHorseshoeTrainer(Trainer):
 
         self.model.analytic_update()
 
-        acc = utils.acc(log_outputs.data, label)
-
-        return loss.item(), kl_loss.item(), nll_loss.item(), acc, log_outputs, label
+        return loss.item(), kl_loss.item(), nll_loss.item(), log_outputs, label
 
     def valid_one_step(self, data, label, beta):
 
-        outputs = torch.zeros(data.shape[0], self.config_train["out_channels"], 1).to(self.device)
+        outputs = torch.zeros(data.shape[0], self.config_model["out_channels"], 1).to(self.device)
 
         pred = self.model(data)
 
@@ -80,15 +81,11 @@ class BNNHorseshoeTrainer(Trainer):
 
         loss, nll_loss, kl_loss = self.loss_fcn(log_outputs, label, kl_loss, beta)
 
-        acc = utils.acc(log_outputs.data, label)
-
-        return loss.item(), kl_loss.item(), nll_loss.item(), acc, log_outputs, label
+        return loss.item(), kl_loss.item(), nll_loss.item(), log_outputs, label
 
     def validate(self, epoch):
         valid_loss_list = []
-        valid_kl_list = []
-        valid_nll_list = []
-        valid_acc_list = []
+
         probs = []
         labels = []
 
@@ -96,22 +93,18 @@ class BNNHorseshoeTrainer(Trainer):
             (data, label) = (data.to(self.device), label.to(self.device))
             # beta = utils.get_beta(i - 1, len(self.valid_loader), "Standard", epoch, self.n_epoch)
             beta = self.beta
-            res, kl, nll, acc, log_outputs, label = self.valid_one_step(data, label, beta)
+            res, kl, nll, log_outputs, label = self.valid_one_step(data, label, beta)
 
-            probs.append(log_outputs.softmax(1).detach().cpu().numpy())
-            labels.append(label.detach().cpu().numpy())
+            probs.append(log_outputs)
+            labels.append(label)
 
             valid_loss_list.append(res)
-            valid_kl_list.append(kl)
-            valid_nll_list.append(nll)
-            valid_acc_list.append(acc)
 
-        valid_loss, valid_acc, valid_kl, valid_nll = np.mean(valid_loss_list), np.mean(valid_acc_list), np.mean(valid_kl_list), np.mean(valid_nll_list)
-        probs = np.concatenate(probs)
-        labels = np.concatenate(labels)
-        precision, recall, f1, aucroc = utils.metrics(probs, labels, average="weighted")
+        probs = torch.cat(probs)
+        labels = torch.cat(labels)
+        test_metrics = utils.metrics(probs, labels, prefix="te")
 
-        return valid_loss, valid_acc, valid_kl, valid_nll, precision, recall, f1, aucroc
+        return test_metrics
 
     def train(self) -> None:
         print(f"Start training Horseshoe BNN...")
@@ -121,65 +114,59 @@ class BNNHorseshoeTrainer(Trainer):
             training_loss_list = []
             kl_list = []
             nll_list = []
-            acc_list = []
             probs = []
             labels = []
 
             beta = self.beta
 
-            self.visualize_map(epoch)
+            # self.visualize_map(epoch)
 
             for i, (data, label) in enumerate(self.dataloader):
                 label = label.to(self.device)
 
-                res, kl, nll, acc, log_outputs, label = self.train_one_step(data, label, beta)
+                res, kl, nll, log_outputs, label = self.train_one_step(data, label, beta)
 
                 training_loss_list.append(res)
                 kl_list.append(kl)
                 nll_list.append(nll)
-                acc_list.append(acc)
 
-                probs.append(log_outputs.softmax(1).detach().cpu().numpy())
-                labels.append(label.detach().cpu().numpy())
+                probs.append(log_outputs)
+                labels.append(label)
 
-            train_loss, train_acc, train_kl, train_nll = np.mean(training_loss_list), np.mean(acc_list), np.mean(
-                kl_list), np.mean(nll_list)
+            probs = torch.cat(probs)
+            labels = torch.cat(labels)
+            train_metrics = utils.metrics(probs, labels)
 
-            probs = np.concatenate(probs)
-            labels = np.concatenate(labels)
-            train_precision, train_recall, train_f1, train_aucroc = utils.metrics(probs, labels, average="weighted")
+            test_metrics = self.validate(epoch)
+            loss_dict = {
+                "loss_tot": np.mean(training_loss_list),
+                "loss_kl": np.mean(kl_list),
+                "loss_ce": np.mean(nll_list)
+            }
+            training_range.set_description(
+                'Epoch: {} \tTr Loss: {:.4f} \tTr Acc: {:.4f} \tVal Acc: {:.4f} \tTr Kl Div: {:.4f} \tTr NLL: {:.4f}'.format(
+                    epoch, loss_dict["loss_tot"], train_metrics["tr_accuracy"],
+                    test_metrics["te_accuracy"], loss_dict["loss_kl"], loss_dict["loss_ce"]))
 
-            valid_loss, valid_acc, valid_kl, valid_nll, val_precision, val_recall, val_f1, val_aucroc = self.validate(epoch)
-
-            training_range.set_description('Epoch: {} \tTraining Loss: {:.4f} \tTraining Accuracy: {:.4f} \tValidation Loss: {:.4f} \tValidation Accuracy: {:.4f} \tTrain_kl_div: {:.4f} \tTrain_nll: {:.4f}'.format(
-                    epoch, train_loss, train_acc, valid_loss, valid_acc, train_kl, train_nll))
+            self.logging(epoch, loss_dict, train_metrics, test_metrics)
 
             # Update new checkpoints and remove old ones
-            if self.save_steps and (epoch + 1) % self.save_steps == 0:
-                epoch_stats = {
-                    "Epoch": epoch + 1,
-                    "Train Loss": train_loss,
-                    "Train NLL Loss": train_nll,
-                    "Train KL Loss": train_kl,
-                    "Train Accuracy": train_acc,
-                    "Train F1": train_f1,
-                    "Train AUC": train_aucroc,
-                    "Validation Loss": valid_loss,
-                    "Validation KL Loss": valid_kl,
-                    "Validation Accuracy": valid_acc,
-                    "Validation F1": val_f1,
-                    "Validation AUC": val_aucroc
-                }
+            epoch_stats = {
+                "Epoch": epoch + 1,
+            }
+            epoch_stats.update(loss_dict)
+            epoch_stats.update(train_metrics)
+            epoch_stats.update(test_metrics)
 
-                # State dict of the model including embeddings
-                self.checkpoint_manager.write_new_version(
-                    self.config,
-                    self.model.state_dict(),
-                    epoch_stats
-                )
+            # State dict of the model including embeddings
+            self.checkpoint_manager.write_new_version(
+                self.config,
+                self.model.state_dict(),
+                epoch_stats
+            )
 
-                # Remove previous checkpoints
-                self.checkpoint_manager.remove_old_version()
+            # Remove previous checkpoints
+            self.checkpoint_manager.remove_old_version()
 
     def visualize_map(self, epoch):
         """
@@ -193,8 +180,8 @@ class BNNHorseshoeTrainer(Trainer):
             pth.mkdir()
 
         # layer = self.model.convs[0]
-        layer = self.model.conv1
 
+        layer = self.model.conv1
         # Sample maps here
         beta = layer.beta.sample(200)
         log_tau = torch.unsqueeze(layer.log_tau.sample(200), 1)

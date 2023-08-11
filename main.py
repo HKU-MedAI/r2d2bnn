@@ -1,11 +1,8 @@
 import argparse
 import random
 
-import numpy as np
 import torch
-import yaml
 
-from globals import *
 from trainer import (
     CNNTrainer,
     CNNMCDropoutTrainer,
@@ -17,28 +14,9 @@ from trainer import (
     HorseshoeLinearRegTrainer,
     MCDLinearRegTrainer,
     BNNUncertaintyTrainer,
+    ClassificationTrainer
 )
-from utils import ordered_yaml
-
-import warnings
-warnings.filterwarnings('ignore')
-
-parser = argparse.ArgumentParser()
-parser.add_argument('-config', type=str, help='Path to option YMAL file.', default="")
-parser.add_argument('-seed', type=int, help='random seed of the run', default=612)
-
-args = parser.parse_args()
-
-opt_path = args.config
-default_config_path = "HorseshoeSimpleCNN_MNIST.yml"
-
-if opt_path == "":
-    opt_path = CONFIG_DIR / default_config_path
-
-# Set seed
-seed = args.seed
-random.seed(seed)
-torch.manual_seed(seed)
+from utils import load_config
 
 ####
 # Set types (train/eval)
@@ -50,6 +28,8 @@ def parse_trainer(config):
     if mode == "train":
         if config["train_type"] == "bnn":
             trainer = BNNTrainer(config)
+        elif config["train_type"] == "classification":
+            trainer = ClassificationTrainer(config)
         elif config["train_type"] == "cnn":
             trainer = CNNTrainer(config)
         elif config["train_type"] == "cnn-mc":
@@ -94,11 +74,15 @@ def benchmark_datasets(config):
 
 
 def main():
-    # Load configurations
-    with open(opt_path, mode='r') as f:
-        loader, _ = ordered_yaml()
-        config = yaml.load(f, loader)
-        print(f"Loaded configs from {opt_path}")
+    TASK = "Classification"
+    DATASET = "CIFAR10"
+
+    config_name = "GaussLeNet.yml"
+    config = load_config(config_name, config_dir=f"./configs/{TASK}/{DATASET}/")
+
+    seed = 512
+    random.seed(seed)
+    torch.manual_seed(seed)
 
     trainer = parse_trainer(config)
     trainer.train()

@@ -1,4 +1,6 @@
 import math
+
+import torch
 import torch.nn as nn
 
 from layers import (
@@ -7,41 +9,35 @@ from layers import (
     FlattenLayer,
 )
 
+from .Base import BaseModel
 
-class BBBLeNet(nn.Module):
+
+class LeNet(BaseModel):
     '''The architecture of LeNet with Bayesian Layers'''
 
-    def __init__(self, outputs, inputs, priors, image_size=32, activation_type='softplus'):
-        super(BBBLeNet, self).__init__()
+    def __init__(self, outputs, inputs, layer_type, priors, image_size=32, activation_type='softplus'):
+        super(LeNet, self).__init__(layer_type, priors, activation_type)
 
         self.num_classes = outputs
-        self.priors = priors
 
-        if activation_type == 'softplus':
-            self.act = nn.Softplus
-        elif activation_type == 'relu':
-            self.act = nn.ReLU
-        else:
-            raise ValueError("Only softplus or relu supported")
-
-        self.conv1 = BBBConv2d(inputs, 6, 5, padding=0, bias=True, priors=self.priors)
+        self.conv1 = self.get_conv_layer(inputs, 6, 5, padding=0)
         self.act1 = self.act()
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         out_size = (image_size - 5 + 1) // 2
 
-        self.conv2 = BBBConv2d(6, 16, 5, padding=0, bias=True, priors=self.priors)
+        self.conv2 = self.get_conv_layer(6, 16, 5, padding=0)
         self.act2 = self.act()
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         out_size = (out_size - 5 + 1) // 2
 
         self.flatten = FlattenLayer(out_size * out_size * 16)
-        self.fc1 = BBBLinear(out_size * out_size * 16, 120, bias=True, priors=self.priors)
+        self.fc1 = self.get_fc_layer(out_size * out_size * 16, 120)
         self.act3 = self.act()
 
-        self.fc2 = BBBLinear(120, 84, bias=True, priors=self.priors)
+        self.fc2 = self.get_fc_layer(120, 84)
         self.act4 = self.act()
 
-        self.fc3 = BBBLinear(84, outputs, bias=True, priors=self.priors)
+        self.fc3 = self.get_fc_layer(84, outputs)
 
     def forward(self, x):
 
@@ -66,7 +62,7 @@ class BBBLeNet(nn.Module):
 
     def kl_loss(self):
         # Compute KL divergences
-        kl = 0.0
+        kl = torch.zeros(1).cuda()
         for module in self.children():
             if hasattr(module, 'kl_loss'):
                 kl = kl + module.kl_loss()

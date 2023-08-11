@@ -7,6 +7,8 @@ import torch
 from checkpoint import CheckpointManager
 from matplotlib import pyplot as plt
 
+import wandb
+
 
 class Trainer(ABC):
     def __init__(self, config: OrderedDict) -> None:
@@ -16,6 +18,8 @@ class Trainer(ABC):
         self.config_train = config['train']
         self.config_optim = config['optimizer']
         self.config_checkpoint = config['checkpoints']
+        self.config_logging = config["logging"]
+        self.config_model = config["model"]
 
         # Define checkpoints manager
         self.checkpoint_manager = CheckpointManager(self.config_checkpoint['path'])
@@ -23,7 +27,8 @@ class Trainer(ABC):
 
         # Load number of epochs
         self.n_epoch = self.config_train['num_epochs']
-        self.starting_epoch = self.checkpoint_manager.version
+        # self.starting_epoch = self.checkpoint_manager.version
+        self.starting_epoch = 0
 
         # Read batch size
         self.batch_size = self.config_train['batch_size']
@@ -37,6 +42,23 @@ class Trainer(ABC):
 
     def train(self) -> None:
         raise NotImplementedError
+
+    def initialize_logger(self, notes=""):
+        name = "_".join(
+            [
+                self.config["name"],
+                self.config_model["name"],
+                self.config_data["name"],
+            ]
+        )
+        tags = self.config["logging"]["tags"]
+        wandb.init(name=name,
+                   project='R2D2BNN',
+                   notes=notes,
+                   config=self.config,
+                   tags=tags,
+                   mode=self.config_logging["mode"]
+                   )
 
     def visualize_conf_interval(self, pred, label, x):
         """
@@ -70,3 +92,9 @@ class Trainer(ABC):
         np.save(pred_path, pred)
 
         plt.close()
+
+    def logging(self, epoch, loss_dict, train_metrics, test_metrics):
+        wandb.log({"epoch": epoch})
+        wandb.log(loss_dict)
+        wandb.log(train_metrics)
+        wandb.log(test_metrics)

@@ -4,5 +4,7 @@ from .flatten import FlattenLayer, ReverseFlattenLayer
 from .horseshoeConv import HorseshoeConvLayer
 from .horseshoe import HorseshoeLinearLayer
 from .r2d2Linear import R2D2LinearLayer
+from .r2d2CondLinear import R2D2CondLinearLayer
 from .r2d2Conv import R2D2ConvLayer
+from .r2d2CondConv import R2D2CondConvLayer
 from .resize import ResizeLayer

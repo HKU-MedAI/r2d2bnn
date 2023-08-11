@@ -5,9 +5,10 @@ from torch.utils.data import Dataset, DataLoader, random_split
 import torchvision
 from torchvision import transforms
 
-from models import MultipleLinear
+from models import MLP
 
-def load_data(config_data, batch_size=32):
+
+def load_data(config_data, batch_size=32, image_size=32):
     if config_data["name"] == "MNIST":
         transform_mnist = transforms.Compose([
             transforms.Resize((32, 32)),
@@ -19,7 +20,7 @@ def load_data(config_data, batch_size=32):
         valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
     elif config_data["name"] == "CIFAR10":
         transform_cifar = transforms.Compose([
-            transforms.Resize((32, 32)),
+            transforms.Resize((image_size, image_size)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
         ])
@@ -69,6 +70,17 @@ def load_data(config_data, batch_size=32):
         # Dataloaders
         train_dataloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
         valid_loader = DataLoader(testset, batch_size=batch_size, shuffle=False)
+    elif config_data["name"] == "ImageNet":
+        transform = transforms.Compose([
+            transforms.Resize((32, 32)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+        ])
+        trainset = torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/train", transform=transform)
+        testset = torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/val", transform=transform)
+        # Dataloaders
+        train_dataloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
+        valid_loader = DataLoader(testset, batch_size=batch_size, shuffle=False)
     else:
         raise NotImplementedError()
 
@@ -95,6 +107,18 @@ def load_uncertainty_data(name, train, image_size, in_channel):
         d = torchvision.datasets.CIFAR10
     elif name == "CIFAR100":
         d = torchvision.datasets.CIFAR100
+    elif name == "ImageNet":
+        if train:
+            return torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/train", transform=transform)
+        else:
+            transform = torchvision.transforms.Compose(
+                [
+                    torchvision.transforms.Grayscale(num_output_channels=in_channel),
+                    torchvision.transforms.ToTensor(),
+                    norm,
+                    torchvision.transforms.Resize((image_size, image_size))
+                ])
+            return torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/val", transform=transform)
     elif name == "Omiglot":
         d = torchvision.datasets.Omniglot
         return d(root='./data', background=train, download=True, transform=transform)

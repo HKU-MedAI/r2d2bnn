@@ -109,7 +109,7 @@ class R2D2LinearLayer(nn.Module):
         # self.bias_mu.data.normal_(*self.posterior_mu_initial)
         self.bias_rho.data.normal_(*self.priors["bias_rho_scale"])
 
-    def forward(self, input_, sample=True, n_samples=100):
+    def forward(self, input_, sample=True, n_samples=25):
         """
         Performs a forward pass through the layer, that is, computes
         the layer output for a given input batch.
@@ -242,8 +242,8 @@ class R2D2LinearLayer(nn.Module):
         p, a, b = self.omega_gib.lamb, \
                   self.omega_gib.rho.detach().numpy(), \
                   self.omega_gib.chi.detach().numpy()
-        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-5
-        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-5
+        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-3
+        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-3
         bessel_ratio = 1 if np.isnan(bassel_plus / bassel) else bassel_plus / bassel
 
         log_omega_exp = log_expect_gig(p, a, b)
@@ -258,8 +258,8 @@ class R2D2LinearLayer(nn.Module):
                   self.psi_gib.rho.detach().numpy(), \
                   self.psi_gib.chi.detach().numpy()
         mu = np.sqrt(1 / a)
-        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-5
-        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-5
+        bassel = kn(p, np.sqrt(b) * np.sqrt(a)) + 1e-3
+        bassel_plus = kn(p + 1, np.sqrt(b) * np.sqrt(a)) + 1e-3
         bessel_ratio = 1 if np.isnan(bassel_plus / bassel).any() else bassel_plus / bassel
 
         log_psi_exp = log_expect_gig(p, a, b)

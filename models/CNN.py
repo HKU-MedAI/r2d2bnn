@@ -2,38 +2,29 @@ import math
 import torch.nn as nn
 
 from layers import (
-    BBBConv2d,
-    BBBLinear,
     FlattenLayer
 )
 
+from .Base import BaseModel
 
-class BBB3Conv3FC(nn.Module):
+
+class CNN(BaseModel):
     """
     Simple Neural Network having 3 Convolution
     and 3 FC layers with Bayesian layers.
     """
 
-    def __init__(self, outputs, inputs, priors, image_size=32, n_blocks=3, layer_type="r2d2", activation_type='softplus'):
-        super(BBB3Conv3FC, self).__init__()
+    def __init__(self, outputs, inputs, layer_type, priors, image_size=32, n_blocks=3, activation_type='softplus'):
+        super(CNN, self).__init__(layer_type, priors, activation_type)
 
         self.num_classes = outputs
-        self.priors = priors
-
-        if activation_type == 'softplus':
-            self.act = nn.Softplus
-        elif activation_type == 'relu':
-            self.act = nn.ReLU
-        else:
-            raise ValueError("Only softplus or relu supported")
-
         self.n_blocks = n_blocks
 
         convs = [
-                BBBConv2d(inputs, 32, 5, padding=2, bias=True, priors=self.priors),
-                BBBConv2d(32, 64, 5, padding=2, bias=True, priors=self.priors),
-                BBBConv2d(64, 128, 5, padding=1, bias=True, priors=self.priors),
-                BBBConv2d(128, 128, 2, padding=1, bias=True, priors=self.priors)
+                self.get_conv_layer(inputs, 32, 5, padding=2),
+                self.get_conv_layer(32, 64, 5, padding=2),
+                self.get_conv_layer(64, 128, 5, padding=1),
+                self.get_conv_layer(128, 128, 2, padding=1)
         ]
 
         pools = [
@@ -58,11 +49,11 @@ class BBB3Conv3FC(nn.Module):
 
         self.dense_block = nn.Sequential(
                 FlattenLayer(out_size * out_size * out_channels),
-                BBBLinear(out_size * out_size * out_channels, 1000, bias=True, priors=self.priors),
+                self.get_fc_layer(out_size * out_size * out_channels, 1000),
                 self.act(),
-                BBBLinear(1000, 1000, bias=True, priors=self.priors),
+                self.get_fc_layer(1000, 1000),
                 self.act(),
-                BBBLinear(1000, outputs, bias=True, priors=self.priors)
+                self.get_fc_layer(1000, outputs)
         )
 
     def kl_loss(self):

@@ -42,22 +42,6 @@ class ELBO(nn.Module):
         total_loss = nll_loss + kl_loss
         return total_loss, nll_loss, kl_loss 
 
-
-class SVDD(nn.Module):
-    def __init__(self, train_size):
-        super(SVDD, self).__init__()
-        self.train_size = train_size
-
-    def forward(self, input, target, kl, beta):
-        assert not target.requires_grad
-        # print(input)
-        # print(F.cross_entropy(input, target, reduction='mean'))
-        # return F.cross_entropy(input, target, reduction='mean') * self.train_size + beta * kl
-        nll_loss = F.nll_loss(input, target, reduction='mean') * self.train_size
-        kl_loss = beta * kl
-        total_loss = nll_loss + kl_loss
-        return total_loss, nll_loss, kl_loss
-
 def acc(outputs, targets):
     return np.mean(outputs.cpu().numpy().argmax(axis=1) == targets.data.cpu().numpy())
 
@@ -65,6 +49,13 @@ def acc(outputs, targets):
 def calculate_kl(mu_q, sig_q, mu_p, sig_p):
     kl = 0.5 * (2 * torch.log(sig_p / sig_q) - 1 + (sig_q / sig_p).pow(2) + ((mu_p - mu_q) / sig_p).pow(2)).mean()
     return kl
+
+def mvg_kl(mu_q, sig_q, mu_p, sig_p):
+    p = sig_p.shape[0]
+    sig_p_inv = torch.inverse(sig_p)
+    return 0.5 * (torch.log(torch.det(sig_p) / torch.det(sig_q)) - p +
+           torch.trace(torch.mm(sig_p_inv, sig_q)) +
+           torch.mm(torch.mm((mu_p - mu_q).unsqueeze(0), sig_p_inv), (mu_p - mu_q).unsqueeze(1)))
 
 
 def get_beta(batch_idx, m, beta_type, epoch, num_epochs):

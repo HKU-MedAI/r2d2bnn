@@ -2,26 +2,14 @@ from torch import optim, nn
 import torch.nn.functional as F
 
 from models import (
-    BBB3Conv3FC,
-    BBBMultipleLinear,
-    BBBLeNet,
-    BBBAlexNet,
-    BBBHorseshoeAlexNet,
-    BBBResNet,
-    BBBHorseshoeCNN,
-    HorseshoeMultipleLinear,
-    BBBHorseshoeLeNet,
-    BBBR2D2LeNet,
-    BBBR2D2AlexNet,
-    R2D2CNN,
-    R2D2MultipleLinear,
+    LeNet,
+    AlexNet,
     ResNet,
     CNN,
-    MultipleLinear,
-    R2D2SimpleCNN,
-    BBBHorseshoeSimpleCNN
+    SimpleCNN,
+    MLP,
+    VGG,
 )
-from models.frequentists import LeNet, EfficientNetB4, AlexNet
 from torchvision.models import resnet18, resnet50
 
 from losses import ELBO
@@ -83,78 +71,46 @@ def parse_loss(config_train):
         raise NotImplementedError("This Loss is not implemented")
 
 
-def parse_bayesian_model(config_train, image_size=32):
+def parse_bayesian_model(config_model, image_size=32):
     # Read input and output dimension
-    in_dim = config_train["in_channels"]
-    out_dim = config_train["out_channels"]
+    in_dim = config_model["in_channels"]
+    out_dim = config_model["out_channels"]
 
-    model_name = config_train["model_name"]
+    model_name = config_model["name"]
+    layer_type = config_model["layer_type"]
 
-    # Read priors for BNNs
-    if model_name in ["BCNN", "BLeNet", "BAlexNet"]:
-        priors = {
-            'prior_mu': config_train["prior_mu"],
-            'prior_sigma': config_train["prior_sigma"],
-            'posterior_mu_initial': config_train["posterior_mu_initial"],
-            'posterior_rho_initial': config_train["posterior_rho_initial"],
-        }
-    elif model_name in ["HorseshoeLeNet", "BHorseshoeAlexNet", "HorseshoeCNN", "HorseshoeMLP", "HorseshoeSimpleCNN"]:
-        priors = {
-            "horseshoe_scale": config_train["horseshoe_scale"],
-            "global_cauchy_scale": config_train["global_cauchy_scale"],
-            "weight_cauchy_scale": config_train["weight_cauchy_scale"],
-            "beta_rho_scale": config_train["beta_rho_scale"],
-            "log_tau_mean": config_train["log_tau_mean"],
-            "log_tau_rho_scale": config_train["log_tau_rho_scale"],
-            "bias_rho_scale": config_train["bias_rho_scale"],
-            "log_v_mean": config_train["log_v_mean"],
-            "log_v_rho_scale": config_train["log_v_rho_scale"]
-        }
-    elif model_name in ["R2D2AlexNet", "R2D2LeNet", "R2D2CNN", "R2D2SimpleCNN", "R2D2MLP"]:
-        priors = {
-            "r2d2_scale": config_train["r2d2_scale"],
-            "prior_phi_prob": config_train["prior_phi_prob"],
-            "prior_psi_shape": config_train["prior_psi_shape"],
-            "beta_rho_scale": config_train["beta_rho_scale"],
-            "bias_rho_scale": config_train["bias_rho_scale"],
-            "weight_xi_shape": config_train["weight_xi_shape"],
-            "weight_omega_shape": config_train["weight_omega_shape"],
-        }
-    else:
+    if layer_type == "Freq":
         priors = None
+    else:
+        priors = config_model["prior"]
 
     if model_name == "BCNN":
-        n_blocks = config_train["n_blocks"]
+        n_blocks = config_model["n_blocks"]
         return BBB3Conv3FC(
             outputs=out_dim,
             inputs=in_dim,
             priors=priors,
             n_blocks=n_blocks
         )
-    elif model_name == "BMLP":
-        n_blocks = config_train["n_blocks"]
-        return BBBMultipleLinear(
+    elif model_name == "MLP":
+        n_blocks = config_model["n_blocks"]
+        return MLP(
             outputs=out_dim,
             inputs=in_dim,
+            layer_type=layer_type,
             priors=priors,
             n_blocks=n_blocks
         )
-    elif model_name == "BLeNet":
-        return BBBLeNet(
+    elif model_name == "LeNet":
+        return LeNet(
             outputs=out_dim,
             inputs=in_dim,
-            priors=priors,
-            image_size=image_size
-        )
-    elif model_name == "HorseshoeLeNet":
-        return BBBHorseshoeLeNet(
-            outputs=out_dim,
-            inputs=in_dim,
+            layer_type=layer_type,
             priors=priors,
             image_size=image_size
         )
     elif model_name == "HorseshoeCNN":
-        n_blocks = config_train["n_blocks"]
+        n_blocks = config_model["n_blocks"]
         return BBBHorseshoeCNN(
             outputs=out_dim,
             inputs=in_dim,
@@ -168,7 +124,7 @@ def parse_bayesian_model(config_train, image_size=32):
             priors=priors
         )
     elif model_name == "HorseshoeMLP":
-        n_blocks = config_train["n_blocks"]
+        n_blocks = config_model["n_blocks"]
         return HorseshoeMultipleLinear(
             outputs=out_dim,
             inputs=in_dim,
@@ -176,7 +132,7 @@ def parse_bayesian_model(config_train, image_size=32):
             n_blocks=n_blocks
         )
     elif model_name == "R2D2CNN":
-        n_blocks = config_train["n_blocks"]
+        n_blocks = config_model["n_blocks"]
         return R2D2CNN(
             outputs=out_dim,
             inputs=in_dim,
@@ -194,7 +150,8 @@ def parse_bayesian_model(config_train, image_size=32):
         return BBBR2D2AlexNet(
             outputs=out_dim,
             inputs=in_dim,
-            priors=priors
+            priors=priors,
+            r2d2_type=r2d2_type
         )
     elif model_name == "R2D2SimpleCNN":
         return R2D2SimpleCNN(
@@ -203,12 +160,13 @@ def parse_bayesian_model(config_train, image_size=32):
             priors=priors
         )
     elif model_name == "R2D2MLP":
-        n_blocks = config_train["n_blocks"]
+        n_blocks = config_model["n_blocks"]
         return R2D2MultipleLinear(
             outputs=out_dim,
             inputs=in_dim,
             priors=priors,
-            n_blocks=n_blocks
+            n_blocks=n_blocks,
+            r2d2_type=r2d2_type
         )
     elif model_name == "BAlexNet":
         model = BBBAlexNet(
@@ -225,10 +183,18 @@ def parse_bayesian_model(config_train, image_size=32):
             priors=priors
         )
         return model
-    elif model_name == "BResNet":
-        return BBBResNet(
+    elif model_name == "ResNet":
+        return ResNet(
             outputs=out_dim,
             inputs=in_dim,
+            layer_type=config_model["layer_type"],
+            priors=priors
+        )
+    elif model_name == "VGG":
+        return VGG(
+            outputs=out_dim,
+            inputs=in_dim,
+            layer_type=config_model["layer_type"],
             priors=priors
         )
     else:
@@ -239,7 +205,7 @@ def parse_frequentist_model(config_freq, image_size=32):
     # Read input and output dimension
     in_dim = config_freq["in_channels"]
     out_dim = config_freq["out_channels"]
-    model_name = config_freq["model_name"]
+    model_name = config_freq["name"]
 
     if model_name == "EfficientNet":
         return EfficientNetB4(
@@ -260,7 +226,7 @@ def parse_frequentist_model(config_freq, image_size=32):
     elif model_name == "ResNet":
         return ResNet(
             outputs=out_dim,
-            inputs=in_dim
+            inputs=in_dim,
         )
     elif model_name == "CNN":
         n_blocks = config_freq["n_blocks"]

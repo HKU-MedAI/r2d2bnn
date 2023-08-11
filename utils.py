@@ -8,9 +8,11 @@ from collections import OrderedDict
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 import numpy as np
 
-from sklearn.metrics import precision_score, recall_score, f1_score, auc, roc_curve, roc_auc_score
+from pyhealth.metrics import binary_metrics_fn, multilabel_metrics_fn, multiclass_metrics_fn
+
 
 def ordered_yaml():
     """
@@ -29,6 +31,16 @@ def ordered_yaml():
     return Loader, Dumper
 
 
+def load_config(name, config_dir="./configs/"):
+    config_path = f"{config_dir}{name}"
+
+    with open(config_path, mode='r') as f:
+        loader, _ = ordered_yaml()
+        config = yaml.load(f, loader)
+        print(f"Loaded configs from {config_path}")
+    return config
+
+
 def logmeanexp(x, dim=None, keepdim=False):
     """Stable computation of log(mean(exp(x))"""
 
@@ -38,8 +50,6 @@ def logmeanexp(x, dim=None, keepdim=False):
     x = x_max + torch.log(torch.mean(torch.exp(x - x_max), dim, keepdim=True))
     return x if keepdim else x.squeeze(dim)
 
-def acc(outputs, targets):
-    return np.mean(outputs.cpu().numpy().argmax(axis=1) == targets.data.cpu().numpy())
 
 def get_beta(batch_idx, m, beta_type, epoch, num_epochs):
     if type(beta_type) is float:
@@ -55,17 +65,37 @@ def get_beta(batch_idx, m, beta_type, epoch, num_epochs):
         beta = 1 / m
     else:
         beta = 0
+
     return beta
 
 
-def metrics(outputs, targets, average='binary'):
-    preds = outputs.argmax(1)
-    precision = precision_score(targets, preds, average=average)
-    recall = recall_score(targets, preds, average=average)
-    f1 = f1_score(targets, preds, average=average)
-    if average == 'binary':
-        fpr, tpr, thresholds = roc_curve(targets, preds)
-        aucroc = auc(fpr, tpr)
+def metrics(outputs, targets, t="multi_class", prefix="tr"):
+
+    if t == "binary":
+        met = binary_metrics_fn(
+            targets.detach().cpu().numpy(),
+            outputs.softmax(1)[:, 1].detach().cpu().numpy(),
+            metrics=["accuracy", "roc_auc", "f1", "pr_auc"]
+        )
+    elif t == "multi_class":
+        met = multiclass_metrics_fn(
+            targets.detach().cpu().numpy(),
+            outputs.softmax(1).detach().cpu().numpy(),
+            metrics=["roc_auc_weighted_ovo", "f1_weighted", "accuracy"]
+        )
+    elif t == "multi_label":
+        met = multilabel_metrics_fn(
+            targets.detach().cpu().numpy(),
+            outputs.detach().cpu().numpy(),
+            metrics=["roc_auc_samples", "pr_auc_samples", "accuracy", "f1_weighted", "jaccard_weighted"]
+        )
+    elif t == "regression":
+        met = {
+            "mse": F.mse_loss(outputs, targets).item(),
+        }
     else:
-        aucroc= roc_auc_score(targets, outputs, multi_class='ovr', average="weighted")
-    return precision, recall, f1, aucroc
+        raise ValueError
+
+    met = {f"{prefix}_{k.split('_')[0]}": v for k, v in met.items()}
+
+    return met

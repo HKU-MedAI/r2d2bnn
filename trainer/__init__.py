@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 from .trainer import Trainer
+from .train_classification import ClassificationTrainer
 from .train_cnn import CNNTrainer
 from .train_bnn import BNNTrainer
 from .train_MCdropout import CNNMCDropoutTrainer

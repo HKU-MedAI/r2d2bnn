@@ -7,30 +7,23 @@ from layers import (
     FlattenLayer,
 )
 
+from .Base import BaseModel
 
-class BBBHorseshoeSimpleCNN(nn.Module):
+
+class SimpleCNN(BaseModel):
     '''The architecture of LeNet with Bayesian Layers'''
 
-    def __init__(self, outputs, inputs, priors, image_size=32, activation_type='softplus'):
-        super(BBBHorseshoeSimpleCNN, self).__init__()
-
-        self.priors = priors
-
-        if activation_type == 'softplus':
-            self.act = nn.Softplus()
-        elif activation_type == 'relu':
-            self.act = nn.ReLU()
-        else:
-            raise ValueError("Only softplus or relu supported")
+    def __init__(self, outputs, inputs, layer_type,  priors, image_size=32, activation_type='softplus'):
+        super(SimpleCNN, self).__init__(layer_type, priors, activation_type)
 
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv1 = HorseshoeConvLayer(inputs, 16, priors, 16, padding=2)
+        self.conv1 = self.get_conv_layer(inputs, 16, 16, padding=2)
         out_size = (image_size - 16 + 2 * 2) // 1 + 1
         out_size = (out_size - 2) // 2 + 1
 
         self.flatten = FlattenLayer(out_size * out_size * 16)
-        self.fc1 = HorseshoeLinearLayer(out_size * out_size * 16, outputs, self.priors)
+        self.fc1 = self.get_fc_layer(out_size * out_size * 16)
 
     def forward(self, x):
 
