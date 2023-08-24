@@ -14,45 +14,38 @@ from data import load_uncertainty_data
 from parse import (
     parse_loss,
     parse_optimizer,
-    parse_bayesian_model
+    parse_model
 )
 
-import torchvision.transforms as transforms
-import torchvision
 import torch
-
-from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.metrics import precision_recall_curve, auc
+import wandb
 
 
-class BNNUncertaintyTrainer(Trainer):
+class UncertaintyTrainer(Trainer):
     def __init__(self, config):
         super().__init__(config)
+
+        self.initialize_logger()
 
         in_data_name = self.config_data["in"]
         ood_data_name = self.config_data["ood"]
         image_size = self.config_data["image_size"]
-        in_channel = self.config_train["in_channels"]
+        in_channel = self.config_model["in_channels"]
 
         train_in = load_uncertainty_data(in_data_name, True, image_size, in_channel)
         test_in = load_uncertainty_data(in_data_name, False, image_size, in_channel)
         train_out = load_uncertainty_data(ood_data_name, True, image_size, in_channel)
         test_out = load_uncertainty_data(ood_data_name, False, image_size, in_channel)
 
-
         self.train_in_loader = DataLoader(train_in, batch_size=self.batch_size, shuffle=True)
         self.test_in_loader = DataLoader(test_in, batch_size=self.batch_size, shuffle=True)
         self.test_out_loader = DataLoader(test_out, batch_size=self.batch_size, shuffle=True)
 
         self.n_samples = self.config_train["n_samples"]
-        self.model = parse_bayesian_model(self.config_train, image_size=image_size)
+        self.model = parse_model(self.config_model, image_size=image_size)
         self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
-        self.loss_fcn = parse_loss(self.config_train)
-
-        # Define beta for ELBO computations
-        # https://github.com/kumar-shridhar/PyTorch-BayesianCNN/blob/master/main_bayesian.py
-        # introduces other beta computations
+        # KL Annealing
         self.beta = self.config_train["beta"]
 
     def get_ood_label_score(self, test_in_score, test_out_score):
@@ -61,33 +54,26 @@ class BNNUncertaintyTrainer(Trainer):
         return label, score
 
     def train_one_step(self, data, label):
+        data = data.to(self.device)
+        label = label.to(self.device)
+
         self.optimzer.zero_grad()
-        data = data.permute(0, 2, 1, 3)
 
-        pred = self.model(data)
+        pred = self.get_pred(data)
+        kl_loss = self.kl_loss()
 
-        if pred.dim() > 2:
-            pred = pred.mean(0)
+        log_outputs = self.reparameterize_output(data, pred)
+        # log_outputs = F.log_softmax(pred, dim=1)
+        nll_loss = F.nll_loss(log_outputs, label, reduction='mean')
 
-        kl_loss = self.model.kl_loss()
-        ce_loss = F.cross_entropy(pred, label, reduction='mean')
-
-        loss = ce_loss + kl_loss.item() * self.beta
-        # loss = ce_loss
+        loss = nll_loss + self.beta * kl_loss
         loss.backward()
 
         self.optimzer.step()
 
-        if hasattr(self.model, "analytic_update"):
-            self.model.analytic_update()
-
-        acc = utils.acc(pred.data, label)
-
-        return loss.item(), kl_loss.item(), ce_loss.item(), acc, pred
+        return loss.item(), kl_loss.item(), nll_loss.item(), log_outputs
 
     def valid_one_step(self, data, label):
-
-        # Develop
 
         data = data.to(self.device)
 
@@ -105,7 +91,7 @@ class BNNUncertaintyTrainer(Trainer):
 
         return entropy, conf
 
-    def validate(self, epoch):
+    def validate(self):
 
         valid_loss_list = []
         in_score_list_ent = []
@@ -140,43 +126,11 @@ class BNNUncertaintyTrainer(Trainer):
         ent_scores = torch.cat([in_scores_ent, out_scores_ent]).detach().cpu().numpy()
         conf_scores = torch.cat([in_scores_conf, out_scores_conf]).detach().cpu().numpy()
 
-        def format_scores(scores):
+        ent_scores = self.format_scores(ent_scores)
+        conf_scores = self.format_scores(conf_scores)
 
-            index = np.isposinf(scores)
-            scores[np.isposinf(scores)] = 1e9
-            maximum = np.amax(scores)
-            scores[np.isposinf(scores)] = maximum + 1
-
-            index = np.isneginf(scores)
-            scores[np.isneginf(scores)] = -1e9
-            minimum = np.amin(scores)
-            scores[np.isneginf(scores)] = minimum - 1
-
-            scores[np.isnan(scores)] = 0
-
-            return scores
-
-        ent_scores = format_scores(ent_scores)
-        conf_scores = format_scores(conf_scores)
-
-        def comp_aucs(scores, labels_1, labels_2):
-
-            auroc_1 = roc_auc_score(labels_1, scores)
-            auroc_2 = roc_auc_score(labels_2, scores)
-            auroc = max(auroc_1, auroc_2)
-
-            precision, recall, thresholds = precision_recall_curve(labels_1, scores)
-            aupr_1 = auc(recall, precision)
-
-            precision, recall, thresholds = precision_recall_curve(labels_2, scores)
-            aupr_2 = auc(recall, precision)
-
-            aupr = max(aupr_1, aupr_2)
-
-            return auroc, aupr
-
-        ent_auroc, ent_aupr = comp_aucs(ent_scores, labels_1, labels_2)
-        conf_auroc, conf_aupr = comp_aucs(conf_scores, labels_1, labels_2)
+        ent_auroc, ent_aupr = self.comp_aucs_ood(ent_scores, labels_1, labels_2)
+        conf_auroc, conf_aupr = self.comp_aucs_ood(conf_scores, labels_1, labels_2)
 
         return ent_auroc, ent_aupr, conf_auroc, conf_aupr
 
@@ -188,60 +142,69 @@ class BNNUncertaintyTrainer(Trainer):
             training_loss_list = []
             kl_list = []
             nll_list = []
-            acc_list = []
             probs = []
             labels = []
 
             for i, (data, label) in enumerate(self.train_in_loader):
-                data = data.to(self.device)
-                data = data.permute(0, 3, 1, 2)
-                label = label.to(self.device)
 
-                res, kl, nll, acc, log_outputs = self.train_one_step(data, label)
+                res, kl, nll, log_outputs = self.train_one_step(data, label)
 
                 training_loss_list.append(res)
                 kl_list.append(kl)
                 nll_list.append(nll)
-                acc_list.append(acc)
 
-                probs.append(log_outputs.softmax(1).detach().cpu().numpy())
-                labels.append(label.detach().cpu().numpy())
+                probs.append(log_outputs)
+                labels.append(label)
 
-            train_loss, train_acc, train_kl, train_nll = np.mean(training_loss_list), np.mean(acc_list), np.mean(
-                kl_list), np.mean(nll_list)
+            train_loss, train_kl, train_nll = np.mean(training_loss_list), np.mean(kl_list), np.mean(nll_list)
 
-            probs = np.concatenate(probs)
-            labels = np.concatenate(labels)
-            train_precision, train_recall, train_f1, train_aucroc = utils.metrics(probs, labels, average="weighted")
+            probs = torch.cat(probs)
+            labels = torch.cat(labels)
+            train_metrics = utils.metrics(probs, labels)
 
-            ent_auroc, ent_aupr, conf_auroc, conf_aupr = self.validate(epoch)
+            ent_auroc, ent_aupr, conf_auroc, conf_aupr = self.validate()
 
             training_range.set_description(
-                'Epoch: {} \tTraining Loss: {:.4f} \tTraining Accuracy: {:.4f} \tEntropy AUC: {:.4f} \tEntropy AUPR: {:.4f} \tConf AUROC: {:.4f} \tConf AUPR: {:.4f}'.format(
-                    epoch, train_loss, train_acc, ent_auroc, ent_aupr, conf_auroc, conf_aupr))
+                'Epoch: {} \tTraining Loss: {:.4f} \tEntropy AUC: {:.4f} \tEntropy AUPR: {:.4f} \tConf AUROC: {:.4f} \tConf AUPR: {:.4f}'.format(
+                    epoch, train_loss,  ent_auroc, ent_aupr, conf_auroc, conf_aupr))
+            epoch_stats = {
+                "Epoch": epoch + 1,
+                "Train Loss": train_loss,
+                "Train NLL Loss": train_nll,
+                "Train KL Loss": train_kl,
+                "Train AUC": train_metrics["tr_roc"],
+                "ENT AUPR": ent_aupr,
+                "ENT AUC": ent_auroc,
+                "CONF AUPR": conf_aupr,
+                "CONF AUC": conf_auroc,
+            }
 
-            # Update new checkpoints and remove old ones
+            self.logging(epoch, epoch_stats)
+
             if self.save_steps and (epoch + 1) % self.save_steps == 0:
-                epoch_stats = {
-                    "Epoch": epoch + 1,
-                    "Train Loss": train_loss,
-                    "Train NLL Loss": train_nll,
-                    "Train KL Loss": train_kl,
-                    "Train Accuracy": train_acc,
-                    "Train F1": train_f1,
-                    "Train AUC": train_aucroc,
-                    "ENT AUPR": ent_aupr,
-                    "ENT AUC": ent_auroc,
-                    "CONF AUPR": conf_aupr,
-                    "CONF AUC": conf_auroc,
-                }
+                self.update_checkpoint(epoch_stats)
 
-                # State dict of the model including embeddings
-                self.checkpoint_manager.write_new_version(
-                    self.config,
-                    self.model.state_dict(),
-                    epoch_stats
-                )
+    def kl_loss(self):
+        kl = self.model.kl_loss()
+        kl = torch.Tensor([kl]).to(self.device)
+        return kl
 
-                # Remove previous checkpoints
-                self.checkpoint_manager.remove_old_version()
+    def initialize_logger(self, notes=""):
+        name = "_".join(
+            [
+                self.config["name"],
+                self.config["train_type"],
+                self.config_model["name"],
+                self.config_data["in"],
+                self.config_data["ood"],
+            ]
+        )
+        tags = self.config["logging"]["tags"]
+        wandb.init(name=name,
+                   project='R2D2BNN',
+                   notes=notes,
+                   config=self.config,
+                   tags=tags,
+                   mode=self.config_logging["mode"]
+                   )
+

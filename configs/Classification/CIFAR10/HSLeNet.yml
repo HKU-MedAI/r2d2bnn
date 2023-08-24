@@ -1,9 +1,7 @@
 #### general settings
-name: BPN
-train_type: bnn-horseshoe
-eval_type: bnn
+name: HS
+train_type: CLS
 gpu_ids: [2]
-
 
 #### datasets
 data:
@@ -16,16 +14,33 @@ checkpoints:
   path: "./checkpoints/HorseshoeLeNet_CIFAR10/"
   save_checkpoint_freq: 2
 
-
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
   lr: 0.001  # Learning rate
   weight_decay: 0.001
 
+#### Model settings
+model:
+  name: "LeNet"
+  layer_type: "HS"
+
+  prior:
+    horseshoe_scale:
+    global_cauchy_scale: 1.
+    weight_cauchy_scale: 1.
+    beta_rho_scale: -5.
+    log_tau_mean:
+    log_tau_rho_scale: -5.
+    bias_rho_scale: -5.
+    log_v_mean:
+    log_v_rho_scale: -5.
+
+  in_channels: 3
+  out_channels: 10
+
 #### training settings: learning rate scheme, loss, optimizer
 train:
-  model_name: "HorseshoeLeNet"
 
   num_epochs: 1000
   batch_size: 128
@@ -33,17 +48,12 @@ train:
 
   beta: 0.00001
 
-  horseshoe_scale:
-  global_cauchy_scale: 1.
-  weight_cauchy_scale: 1.
-  beta_rho_scale: -5.
-  log_tau_mean:
-  log_tau_rho_scale: -5.
-  bias_rho_scale: -5.
-  log_v_mean:
-  log_v_rho_scale: -5.
-
-  in_channels: 3
-  out_channels: 10
-
-  loss: "ELBO"
+#### Logging
+logging:
+  mode: online # disabled
+  tags: [
+      "CIFAR10",
+      "Classification",
+      "LeNet",
+      "Horseshoe"
+    ]

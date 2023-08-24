@@ -3,17 +3,15 @@ import random
 
 import torch
 
+import numpy as np
+np.seterr(all="ignore")
+
 from trainer import (
-    CNNTrainer,
-    CNNMCDropoutTrainer,
-    BNNTrainer,
     BLinearRegTrainer,
-    BNNHorseshoeTrainer,
-    R2D2BNNTrainer,
     R2D2LinearRegTrainer,
     HorseshoeLinearRegTrainer,
     MCDLinearRegTrainer,
-    BNNUncertaintyTrainer,
+    UncertaintyTrainer,
     ClassificationTrainer
 )
 from utils import load_config
@@ -26,18 +24,8 @@ mode = "train"
 
 def parse_trainer(config):
     if mode == "train":
-        if config["train_type"] == "bnn":
-            trainer = BNNTrainer(config)
-        elif config["train_type"] == "classification":
+        if config["train_type"] == "CLS":
             trainer = ClassificationTrainer(config)
-        elif config["train_type"] == "cnn":
-            trainer = CNNTrainer(config)
-        elif config["train_type"] == "cnn-mc":
-            trainer = CNNMCDropoutTrainer(config)
-        elif config["train_type"] == "bnn-horseshoe":
-            trainer = BNNHorseshoeTrainer(config)
-        elif config["train_type"] == "bnn-r2d2":
-            trainer = R2D2BNNTrainer(config)
         elif config["train_type"] == "bnn-linreg":
             trainer = BLinearRegTrainer(config)
         elif config["train_type"] == "r2d2-linreg":
@@ -46,8 +34,8 @@ def parse_trainer(config):
             trainer = HorseshoeLinearRegTrainer(config)
         elif config["train_type"] == "mcd-linreg":
             trainer = MCDLinearRegTrainer(config)
-        elif config["train_type"] == "bnn-uncertainty":
-            trainer = BNNUncertaintyTrainer(config)
+        elif config["train_type"] == "OOD":
+            trainer = UncertaintyTrainer(config)
         else:
             raise NotImplementedError(f"Trainer of type {config['train_type']} is not implemented")
     else:
@@ -74,11 +62,13 @@ def benchmark_datasets(config):
 
 
 def main():
-    TASK = "Classification"
-    DATASET = "CIFAR10"
+    TASK = "OOD"
+    # DATASET = "CIFAR10"
+    DATASET = "MNIST/OMIGLOT"
 
-    config_name = "GaussLeNet.yml"
-    config = load_config(config_name, config_dir=f"./configs/{TASK}/{DATASET}/")
+    config_name = "R2D2LeNet.yml"
+    config = load_config(config_name, config_dir="/".join([
+        ".", "configs", TASK, DATASET, ""]))
 
     seed = 512
     random.seed(seed)

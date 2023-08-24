@@ -4,85 +4,50 @@ import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 import torchvision
 from torchvision import transforms
+from torchvision.datasets import ImageFolder
+
+import pathlib
+import tarfile
+import requests
+import shutil
+
+from tqdm import tqdm
 
 from models import MLP
 
 
 def load_data(config_data, batch_size=32, image_size=32):
+    transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+    ])
     if config_data["name"] == "MNIST":
-        transform_mnist = transforms.Compose([
-            transforms.Resize((32, 32)),
-            transforms.ToTensor(),
-        ])
-        training_data = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform_mnist)
-        train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-        testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform_mnist)
-        valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
+        train_set = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+        test_set = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
     elif config_data["name"] == "CIFAR10":
-        transform_cifar = transforms.Compose([
-            transforms.Resize((image_size, image_size)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
-        training_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True,
-                                                     transform=transform_cifar)
-        train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-        testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_cifar)
-        valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
+        train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+        test_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
     elif config_data["name"] == "CIFAR100":
-        transform_cifar = transforms.Compose([
-            transforms.Resize((32, 32)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
-        training_data = torchvision.datasets.CIFAR100(root='./data', train=True, download=True,
-                                                      transform=transform_cifar)
-        train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-        testset = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_cifar)
-        valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
-    elif config_data["name"] == "Omniglot":
-        transform = transforms.Compose([
-            transforms.Resize((32, 32)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
-        training_data = torchvision.datasets.Omniglot(root='./data', background=True, download=True,
-                                                     transform=transform)
-        train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-        testset = torchvision.datasets.Omniglot(root='./data', background=False, download=True, transform=transform)
-        valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
-    elif config_data["name"] == "FashionMNIST":
-        transform = transforms.Compose([
-            transforms.Resize((32, 32)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
-        training_data = torchvision.datasets.FashionMNIST(root='./data', train=True, download=True,
-                                                     transform=transform)
-        train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-        testset = torchvision.datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
-        valid_loader = DataLoader(testset, batch_size=batch_size, num_workers=4)
+        train_set = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform)
+        test_set = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform)
     elif config_data["name"] == "simulated":
         n = config_data["n"]
         scenario = config_data["scenario"]
-        trainset, testset = simulate(n, scenario)
+        train_set, test_set = simulate(n, scenario)
 
+    elif config_data["name"] == "TinyImageNet":
+        train_set = torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/train", transform=transform)
+        test_set = torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/val", transform=transform)
         # Dataloaders
-        train_dataloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
-        valid_loader = DataLoader(testset, batch_size=batch_size, shuffle=False)
     elif config_data["name"] == "ImageNet":
-        transform = transforms.Compose([
-            transforms.Resize((32, 32)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
-        trainset = torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/train", transform=transform)
-        testset = torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/val", transform=transform)
-        # Dataloaders
-        train_dataloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
-        valid_loader = DataLoader(testset, batch_size=batch_size, shuffle=False)
+        train_set = ImageNetV2Dataset(variant="matched-frequency", location="./data")
+        test_set = ImageNetV2Dataset(variant="val", location="./data")
     else:
         raise NotImplementedError()
+
+    train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+    valid_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
     return train_dataloader, valid_loader
 
@@ -107,7 +72,7 @@ def load_uncertainty_data(name, train, image_size, in_channel):
         d = torchvision.datasets.CIFAR10
     elif name == "CIFAR100":
         d = torchvision.datasets.CIFAR100
-    elif name == "ImageNet":
+    elif name == "TinyImageNet":
         if train:
             return torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/train", transform=transform)
         else:
@@ -130,6 +95,7 @@ def load_uncertainty_data(name, train, image_size, in_channel):
         raise NotImplementedError
 
     return d(root='./data', train=train, download=True, transform=transform)
+
 
 def simulate(n, scenario):
     dataset = SimulatedDataset(n, scenario)
@@ -201,3 +167,80 @@ class SimulatedDataset(Dataset):
             idx = idx.tolist()
 
         return self.covariates[idx], self.y[idx]
+
+URLS = {"matched-frequency" : "https://huggingface.co/datasets/vaishaal/ImageNetV2/resolve/main/imagenetv2-matched-frequency.tar.gz",
+        "threshold-0.7" : "https://huggingface.co/datasets/vaishaal/ImageNetV2/resolve/main/imagenetv2-threshold0.7.tar.gz",
+        "top-images": "https://huggingface.co/datasets/vaishaal/ImageNetV2/resolve/main/imagenetv2-top-images.tar.gz",
+        "val": "https://imagenet2val.s3.amazonaws.com/imagenet_validation.tar.gz"}
+
+FNAMES = {"matched-frequency" : "imagenetv2-matched-frequency-format-val",
+        "threshold-0.7" : "imagenetv2-threshold0.7-format-val",
+        "top-images": "imagenetv2-top-images-format-val",
+        "val": "imagenet_validation"}
+
+
+V2_DATASET_SIZE = 10000
+VAL_DATASET_SIZE = 50000
+
+
+class ImageNetValDataset(Dataset):
+    def __init__(self, transform=None, location="."):
+        self.dataset_root = pathlib.Path(f"{location}/imagenet_validation/")
+        self.tar_root = pathlib.Path(f"{location}/imagenet_validation.tar.gz")
+        self.fnames = list(self.dataset_root.glob("**/*.JPEG"))
+        self.transform = transform
+        if not self.dataset_root.exists() or len(self.fnames) != VAL_DATASET_SIZE:
+            if not self.tar_root.exists():
+                print(f"Dataset imagenet-val not found on disk, downloading....")
+                response = requests.get(URLS["val"], stream=True)
+                total_size_in_bytes= int(response.headers.get('content-length', 0))
+                block_size = 1024 #1 Kibibyte
+                progress_bar = tqdm(total=total_size_in_bytes, unit='iB', unit_scale=True)
+                with open(self.tar_root, 'wb') as f:
+                    for data in response.iter_content(block_size):
+                        progress_bar.update(len(data))
+                        f.write(data)
+                progress_bar.close()
+                if total_size_in_bytes != 0 and progress_bar.n != total_size_in_bytes:
+                    assert False, f"Downloading from {URLS[variant]} failed"
+            print("Extracting....")
+            tarfile.open(self.tar_root).extractall(f"{location}")
+            shutil.move(f"{location}/{FNAMES['val']}", self.dataset_root)
+
+        self.dataset = ImageFolder(self.dataset_root)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, i):
+        img, label = self.dataset[i]
+        if self.transform is not None:
+            img = self.transform(img)
+        return img, label
+
+
+class ImageNetV2Dataset(Dataset):
+    def __init__(self, variant="matched-frequency", transform=None, location="."):
+        self.dataset_root = pathlib.Path(f"{location}/ImageNetV2-{variant}/")
+        self.tar_root = pathlib.Path(f"{location}/ImageNetV2-{variant}.tar.gz")
+        self.fnames = list(self.dataset_root.glob("**/*.jpeg"))
+        self.transform = transform
+        assert variant in URLS, f"unknown V2 Variant: {variant}"
+        if not self.dataset_root.exists() or len(self.fnames) != V2_DATASET_SIZE:
+            if not self.tar_root.exists():
+                print(f"Dataset {variant} not found on disk, downloading....")
+                response = requests.get(URLS[variant], stream=True)
+                total_size_in_bytes= int(response.headers.get('content-length', 0))
+                block_size = 1024 #1 Kibibyte
+                progress_bar = tqdm(total=total_size_in_bytes, unit='iB', unit_scale=True)
+                with open(self.tar_root, 'wb') as f:
+                    for data in response.iter_content(block_size):
+                        progress_bar.update(len(data))
+                        f.write(data)
+                progress_bar.close()
+                if total_size_in_bytes != 0 and progress_bar.n != total_size_in_bytes:
+                    assert False, f"Downloading from {URLS[variant]} failed"
+            print("Extracting....")
+            tarfile.open(self.tar_root).extractall(f"{location}")
+            shutil.move(f"{location}/{FNAMES[variant]}", self.dataset_root)
+            self.fnames = list(self.dataset_root.glob("**/*.jpeg"))

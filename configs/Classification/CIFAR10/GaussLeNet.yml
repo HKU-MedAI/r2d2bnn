@@ -1,6 +1,6 @@
 #### general settings
 name: Gauss
-train_type: classification
+train_type: CLS
 gpu_ids: [2]
 
 

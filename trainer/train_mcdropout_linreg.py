@@ -14,7 +14,6 @@ import utils
 from parse import (
     parse_loss,
     parse_optimizer,
-    parse_frequentist_model
 )
 
 import torchvision.transforms as transforms

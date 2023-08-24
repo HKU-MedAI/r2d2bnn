@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from parse import parse_bayesian_model
+from parse import parse_model
 
 import yaml
 from utils import ordered_yaml
@@ -33,7 +33,7 @@ def read_model(opt_path, state_dict):
         loader, _ = ordered_yaml()
         config = yaml.load(f, loader)
 
-    model = parse_bayesian_model(config["train"])
+    model = parse_model(config["train"])
     model.load_state_dict(state_dict)
     model.eval()
 

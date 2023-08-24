@@ -127,7 +127,7 @@ class R2D2ConvLayer(nn.Module):
         """
         beta = self.beta_.sample(n_samples)
         beta_sigma = self.beta_.std_dev.detach()
-        beta_eps = torch.empty(beta.size()).normal_(0, 1)
+        beta_eps = torch.empty(beta.size(), device=beta_sigma.device).normal_(0, 1)
         beta_std = torch.sqrt(beta_sigma ** 2 * self.omega * self.phi * self.psi / 2)
         weight = self.beta_.mean + beta_std * beta_eps
         weight = weight.mean(0)
@@ -196,8 +196,10 @@ class R2D2ConvLayer(nn.Module):
         bias = self.bias.mean.detach()
         beta_sigma = self.beta_.std_dev.detach()
         bias_sigma = self.bias.std_dev.detach()
-        kl = calculate_kl(self.prior_mu, self.prior_beta_sigma, beta, beta_sigma)
-        kl += calculate_kl(self.prior_mu, self.prior_bias_sigma, bias, bias_sigma)
+        pbeta_sigma = self.prior_beta_sigma.to(beta.device)
+        pbias_sigma = self.prior_bias_sigma.to(beta.device)
+        kl = calculate_kl(self.prior_mu, pbeta_sigma, beta, beta_sigma)
+        kl += calculate_kl(self.prior_mu, pbias_sigma, bias, bias_sigma)
         return kl
 
     def analytic_kl(self):

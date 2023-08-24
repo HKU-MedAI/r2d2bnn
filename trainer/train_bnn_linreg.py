@@ -14,7 +14,7 @@ import utils
 from parse import (
     parse_loss,
     parse_optimizer,
-    parse_bayesian_model
+    parse_model
 )
 
 import torchvision.transforms as transforms
@@ -28,7 +28,7 @@ class BLinearRegTrainer(Trainer):
 
         self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size)
 
-        self.model = parse_bayesian_model(self.config_train).to(self.device)
+        self.model = parse_model(self.config_train).to(self.device)
         self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
         self.loss_fcn = parse_loss(self.config_train)

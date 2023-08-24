@@ -42,9 +42,6 @@ class ELBO(nn.Module):
         total_loss = nll_loss + kl_loss
         return total_loss, nll_loss, kl_loss 
 
-def acc(outputs, targets):
-    return np.mean(outputs.cpu().numpy().argmax(axis=1) == targets.data.cpu().numpy())
-
 
 def calculate_kl(mu_q, sig_q, mu_p, sig_p):
     kl = 0.5 * (2 * torch.log(sig_p / sig_q) - 1 + (sig_q / sig_p).pow(2) + ((mu_p - mu_q) / sig_p).pow(2)).mean()

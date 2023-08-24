@@ -285,6 +285,7 @@ class ReparametrizedGaussian(Distribution):
 
     def sample(self, n_samples=1):
         epsilon = torch.distributions.Normal(0, 1).sample(sample_shape=(n_samples, *self.mean.size()))
+        epsilon = epsilon.to(self.mean.device)
         return self.mean + self.std_dev * epsilon
 
     def logprob(self, target):
@@ -308,10 +309,10 @@ class ReparametrizedGaussian(Distribution):
             dim = len(self.mean)
             # n_outputs = 1
 
-        part1 = dim / 2 * (torch.log(torch.tensor([2 * math.pi])) + 1)
+        part1 = dim / 2 * (math.log(2 * math.pi) + 1)
         part2 = torch.sum(torch.log(self.std_dev))
 
-        return part1 + part2
+        return (part1 + part2).unsqueeze(0)
 
 
 class ReparameterizedMultivariateGaussian(Distribution):

@@ -20,7 +20,7 @@ class ResNet(BaseModel):
         self.num_classes = outputs
         self.priors = priors
 
-        model = resnet50(pretrained=True).cuda()
+        model = resnet50(pretrained=False).cuda()
 
         self.model = self.build_model(model)
 

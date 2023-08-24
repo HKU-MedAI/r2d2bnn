@@ -50,15 +50,19 @@ class AlexNet(BaseModel):
 
         self.classifier = self.get_fc_layer(output_size_3 * output_size_3 * 256, outputs)
 
-    def forward(self, x):
+    def forward(self, x, p=0):
 
         x = self.convs[0](x)
         x = self.act(x)
         x = self.pools[0](x)
 
+        x = F.dropout(x, p=p)
+
         x = self.convs[1](x)
         x = self.act(x)
         x = self.pools[1](x)
+
+        x = F.dropout(x, p=p)
 
         x = self.convs[2](x)
         x = self.act(x)

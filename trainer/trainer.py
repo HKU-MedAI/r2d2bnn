@@ -3,11 +3,16 @@ from collections import OrderedDict
 
 import numpy as np
 import torch
+from torch.nn import functional as F
 
 from checkpoint import CheckpointManager
+from parse import parse_model
+import utils
 from matplotlib import pyplot as plt
 
 import wandb
+
+from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
 
 
 class Trainer(ABC):
@@ -38,15 +43,22 @@ class Trainer(ABC):
         self.device = "cuda" if config['gpu_ids'] else "cpu"
         self.use_gpu = True if self.device == "cuda" else False
 
-        self.model = None
+        self.load_model()
 
     def train(self) -> None:
         raise NotImplementedError
+
+    def load_model(self):
+        n_models = self.config_model.get("n_models")
+        self.model = parse_model(self.config_model)
+        if self.config["name"] != "HS":
+            self.model = self.model.to(self.device)
 
     def initialize_logger(self, notes=""):
         name = "_".join(
             [
                 self.config["name"],
+                self.config["train_type"],
                 self.config_model["name"],
                 self.config_data["name"],
             ]
@@ -93,8 +105,76 @@ class Trainer(ABC):
 
         plt.close()
 
-    def logging(self, epoch, loss_dict, train_metrics, test_metrics):
+    @staticmethod
+    def format_scores(scores):
+        index = np.isposinf(scores)
+        scores[np.isposinf(scores)] = 1e9
+        maximum = np.amax(scores)
+        scores[np.isposinf(scores)] = maximum + 1
+
+        index = np.isneginf(scores)
+        scores[np.isneginf(scores)] = -1e9
+        minimum = np.amin(scores)
+        scores[np.isneginf(scores)] = minimum - 1
+
+        scores[np.isnan(scores)] = 0
+
+        return scores
+
+    def comp_aucs_ood(self, scores, labels_1, labels_2):
+        auroc_1 = roc_auc_score(labels_1, scores)
+        auroc_2 = roc_auc_score(labels_2, scores)
+        auroc = max(auroc_1, auroc_2)
+
+        precision, recall, thresholds = precision_recall_curve(labels_1, scores)
+        aupr_1 = auc(recall, precision)
+
+        precision, recall, thresholds = precision_recall_curve(labels_2, scores)
+        aupr_2 = auc(recall, precision)
+
+        aupr = max(aupr_1, aupr_2)
+
+        return auroc, aupr
+
+    def get_pred(self, data):
+
+        dropout = self.config_train.get("mcd")
+
+        if dropout:  # MCDropout
+            preds = [self.model(data, dropout) for _ in range(50)]
+            preds = torch.stack(preds)
+        else:
+            preds = self.model(data)
+
+        return preds
+
+    def reparameterize_output(self, data, pred):
+        if pred.dim() > 2:
+            pred = pred.mean(0)
+        outputs = torch.zeros(data.shape[0], self.config_model["out_channels"], 1).to(self.device)
+        outputs[:, :, 0] = F.log_softmax(pred, dim=1)
+        return utils.logmeanexp(outputs, dim=2)
+
+    def kl_loss(self):
+        kl = self.model.kl_loss()
+        kl = torch.Tensor([kl]).to(self.device)
+        return kl
+
+    def logging(self, epoch, epoch_stats):
         wandb.log({"epoch": epoch})
-        wandb.log(loss_dict)
-        wandb.log(train_metrics)
-        wandb.log(test_metrics)
+        wandb.log(epoch_stats)
+
+    def update_checkpoint(self, epoch_stats):
+        """
+        Update new checkpoints and remove old ones
+        """
+
+        # State dict of the model including embeddings
+        self.checkpoint_manager.write_new_version(
+            self.config,
+            self.model.state_dict(),
+            epoch_stats
+        )
+
+        # Remove previous checkpoints
+        self.checkpoint_manager.remove_old_version()

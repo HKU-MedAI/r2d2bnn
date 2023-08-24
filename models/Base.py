@@ -7,7 +7,8 @@ from layers import (
     R2D2CondLinearLayer,
     BBBLinear,
     BBBConv2d,
-    HorseshoeLinearLayer
+    HorseshoeLinearLayer,
+    HorseshoeConvLayer
 )
 
 
@@ -20,9 +21,9 @@ class BaseModel(nn.Module):
         self.activation_type = activation_type
 
         if activation_type == 'softplus':
-            self.act = nn.Softplus
+            self.act = nn.Softplus()
         elif activation_type == 'relu':
-            self.act = nn.ReLU
+            self.act = nn.ReLU()
         else:
             raise ValueError("Only softplus or relu supported")
 
@@ -41,7 +42,7 @@ class BaseModel(nn.Module):
             raise ValueError("This Layer type is not implemented")
 
     def get_conv_layer(self, in_dim, out_dim, kernel, stride=1, padding=0):
-        if self.layer_type == "r2d2_marginal":
+        if self.layer_type == "R2D2M":
             return R2D2ConvLayer(in_dim, out_dim, self.priors, kernel, stride=stride, padding=padding)
         elif self.layer_type == "Gauss":
             return BBBConv2d(in_dim, out_dim, kernel, stride=stride, padding=padding, bias=True, priors=self.priors)
@@ -49,6 +50,8 @@ class BaseModel(nn.Module):
             return R2D2CondConvLayer(in_dim, out_dim, self.priors, kernel, stride=stride, padding=padding)
         elif self.layer_type == "Freq":
             return nn.Conv2d(in_dim, out_dim, kernel, stride=stride, padding=padding)
+        elif self.layer_type == "HS":
+            return HorseshoeConvLayer(in_dim, out_dim, self.priors, kernel, stride=stride, padding=padding)
         else:
             raise ValueError("This Conv layer type is not implemented")
 
