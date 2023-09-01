@@ -5,8 +5,10 @@ from models import (
     LeNet,
     AlexNet,
     ResNet,
+    ResNet101,
     CNN,
     SimpleCNN,
+    ViT,
     MLP,
     VGG,
 )
@@ -105,6 +107,7 @@ def parse_model(config_model, image_size=32):
             inputs=in_dim,
             layer_type=layer_type,
             priors=priors,
+            image_size=image_size
         )
     elif model_name == "ResNet":
         return ResNet(
@@ -113,8 +116,22 @@ def parse_model(config_model, image_size=32):
             layer_type=config_model["layer_type"],
             priors=priors
         )
+    elif model_name == "ResNet101":
+        return ResNet101(
+            outputs=out_dim,
+            inputs=in_dim,
+            layer_type=config_model["layer_type"],
+            priors=priors
+        )
     elif model_name == "VGG":
         return VGG(
+            outputs=out_dim,
+            inputs=in_dim,
+            layer_type=config_model["layer_type"],
+            priors=priors
+        )
+    elif model_name == "VIT":
+        return ViT(
             outputs=out_dim,
             inputs=in_dim,
             layer_type=config_model["layer_type"],

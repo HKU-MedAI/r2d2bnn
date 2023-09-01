@@ -7,13 +7,13 @@ gpu_ids: [2]
 
 #### datasets
 data:
-  name: "CIFAR10"
+  name: "TinyImageNet"
   image_size: 32
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2_ResNet50_CIFAR10/"
+  path: "./checkpoints/R2D2_ResNet50_TinyImageNet/"
   save_checkpoint_freq: 2
 
 
@@ -38,7 +38,7 @@ model:
     weight_omega_shape: 0.5
 
   in_channels: 3
-  out_channels: 10
+  out_channels: 200
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
@@ -52,8 +52,8 @@ train:
 logging:
   mode: online # disabled
   tags: [
-      "CIFAR10",
-      "Classification",
+      "TinyImageNet",
+      "CLS",
       "ResNet50",
       "R2D2",
       "Marginal",

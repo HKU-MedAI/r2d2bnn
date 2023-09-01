@@ -2,21 +2,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Conv2d
-from torchvision.models import resnet50
+from torchvision.models import vit_l_16
 
 import random
 
 from .Base import BaseModel
 
 
-class ResNet(BaseModel):
+class ViT(BaseModel):
     def __init__(self, outputs, inputs, layer_type="r2d2_marginal", priors=None):
-        super(ResNet, self).__init__(layer_type)
+        super(ViT, self).__init__(layer_type)
 
         self.num_classes = outputs
         self.priors = priors
 
-        model = resnet50(pretrained=False).cuda()
+        model = vit_l_16(pretrained=False).cuda()
 
         self.model = self.build_model(model)
 

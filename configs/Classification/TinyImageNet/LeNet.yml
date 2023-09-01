@@ -5,7 +5,7 @@ gpu_ids: [2]
 
 #### datasets
 data:
-  name: "ImageNet"
+  name: "TinyImageNet"
   image_size: 64
   train_path: None
 
@@ -50,7 +50,7 @@ logging:
   logging:
     mode: disabled # disabled
     tags: [
-      "ImageNet",
+      "TinyImageNet",
       "Classification",
       "LeNet",
       "Gaussian"

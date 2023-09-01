@@ -2,21 +2,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Conv2d
-from torchvision.models import resnet50
+from torchvision.models import resnet101
 
 import random
 
 from .Base import BaseModel
 
 
-class ResNet(BaseModel):
+class ResNet101(BaseModel):
     def __init__(self, outputs, inputs, layer_type="r2d2_marginal", priors=None):
-        super(ResNet, self).__init__(layer_type)
+        super(ResNet101, self).__init__(layer_type)
 
         self.num_classes = outputs
         self.priors = priors
 
-        model = resnet50(pretrained=False).cuda()
+        model = resnet101(pretrained=False).cuda()
 
         self.model = self.build_model(model)
 
@@ -44,7 +44,7 @@ class ResNet(BaseModel):
         model.conv1 = self.freq_to_bayes(model.conv1, "conv")
 
         for l in range(4):
-            for s in range(6):
+            for s in range(23):
                 for c in range(1, 4):
                     try:
                         m = getattr(getattr(model, f"layer{l+1}")[s], f"conv{c}")

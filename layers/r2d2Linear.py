@@ -206,6 +206,8 @@ class R2D2LinearLayer(nn.Module):
         kl = calculate_kl(self.prior_mu, pbeta_sigma, beta, beta_sigma)
         kl += calculate_kl(self.prior_mu, pbias_sigma, bias, bias_sigma)
         return kl
+
+
     def analytic_kl(self):
 
         def log_expect_gig(p, a, b):

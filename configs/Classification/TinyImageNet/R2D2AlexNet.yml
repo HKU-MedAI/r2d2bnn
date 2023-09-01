@@ -7,13 +7,13 @@ gpu_ids: [2]
 
 #### datasets
 data:
-  name: "CIFAR10"
-  image_size: 32
+  name: "TinyImageNet"
+  image_size: 64
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2_ResNet50_CIFAR10/"
+  path: "./checkpoints/R2D2_AlexNet_TinyImageNet/"
   save_checkpoint_freq: 2
 
 
@@ -25,7 +25,7 @@ optimizer:
 
 #### Model Settings
 model:
-  name: "ResNet"
+  name: "AlexNet"
   layer_type: R2D2M
 
   prior:
@@ -38,11 +38,11 @@ model:
     weight_omega_shape: 0.5
 
   in_channels: 3
-  out_channels: 10
+  out_channels: 200
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
-  num_epochs: 200
+  num_epochs: 2000
   batch_size: 1024
   train_size: 1
 
@@ -52,9 +52,9 @@ train:
 logging:
   mode: online # disabled
   tags: [
-      "CIFAR10",
-      "Classification",
-      "ResNet50",
+      "TinyImageNet",
+      "CLS",
+      "AlexNet",
       "R2D2",
       "Marginal",
     ]

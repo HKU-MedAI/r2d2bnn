@@ -13,7 +13,7 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2_ResNet50_CIFAR10/"
+  path: "./checkpoints/R2D2_ResNet101_CIFAR10/"
   save_checkpoint_freq: 2
 
 
@@ -25,7 +25,7 @@ optimizer:
 
 #### Model Settings
 model:
-  name: "ResNet"
+  name: "ResNet101"
   layer_type: R2D2M
 
   prior:
@@ -54,7 +54,7 @@ logging:
   tags: [
       "CIFAR10",
       "Classification",
-      "ResNet50",
+      "ResNet101",
       "R2D2",
       "Marginal",
     ]

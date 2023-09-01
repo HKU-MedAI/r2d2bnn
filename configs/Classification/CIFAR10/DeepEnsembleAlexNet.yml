@@ -1,17 +1,17 @@
 #### general settings
-name: FREQ
+name: DE_Freq
 train_type: CLS
 gpu_ids: [2]
 
 #### datasets
 data:
-  name: "ImageNet"
-  image_size: 64
+  name: "CIFAR10"
+  image_size: 32
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/LeNet_ImageNet/"
+  path: "./checkpoints/AlexNet_CIFAR10/"
   save_checkpoint_freq: 2
 
 #### Optimizer settings
@@ -22,8 +22,9 @@ optimizer:
 
 #### Model settings
 model:
-  name: "LeNet"
+  name: "AlexNet"
   layer_type: Freq
+  n_models: 5
 
   in_channels: 3
   out_channels: 10
@@ -31,7 +32,7 @@ model:
 #### training settings: learning rate scheme, loss, optimizer
 train:
 
-  num_epochs: 1000
+  num_epochs: 500
   batch_size: 128
   train_size: 1
 
@@ -41,17 +42,9 @@ train:
 logging:
   mode: online # disabled
   tags: [
-      "ImageNet",
-      "Classification",
-      "LeNet",
-      "Frequentist"
-    ]
-  #### Logging
-  logging:
-    mode: disabled # disabled
-    tags: [
-      "ImageNet",
-      "Classification",
-      "LeNet",
-      "Gaussian"
+      "CIFAR10",
+      "CLS",
+      "AlexNet",
+      "Frequentist",
+      "DeepEnsemble"
     ]

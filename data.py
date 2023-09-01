@@ -84,7 +84,7 @@ def load_uncertainty_data(name, train, image_size, in_channel):
                     torchvision.transforms.Resize((image_size, image_size))
                 ])
             return torchvision.datasets.ImageFolder(root="./data/tiny-imagenet-200/val", transform=transform)
-    elif name == "Omiglot":
+    elif name == "OMIGLOT":
         d = torchvision.datasets.Omniglot
         return d(root='./data', background=train, download=True, transform=transform)
     elif name == "SVHN":

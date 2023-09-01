@@ -1,5 +1,5 @@
 #### general settings
-name: Freq
+name: HS
 train_type: CLS
 gpu_ids: [2]
 
@@ -11,19 +11,30 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/LeNet_CIFAR100/"
+  path: "./checkpoints/HorseshoeLeNet_CIFAR100/"
   save_checkpoint_freq: 2
 
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.005  # Learning rate
+  lr: 0.001  # Learning rate
   weight_decay: 0.001
 
 #### Model settings
 model:
-  name: "LeNet"
-  layer_type: Freq
+  name: "AlexNet"
+  layer_type: "HS"
+
+  prior:
+    horseshoe_scale:
+    global_cauchy_scale: 1.
+    weight_cauchy_scale: 1.
+    beta_rho_scale: -5.
+    log_tau_mean:
+    log_tau_rho_scale: -5.
+    bias_rho_scale: -5.
+    log_v_mean:
+    log_v_rho_scale: -5.
 
   in_channels: 3
   out_channels: 100
@@ -35,7 +46,7 @@ train:
   batch_size: 128
   train_size: 1
 
-  loss: "CE"
+  beta: 0.00001
 
 #### Logging
 logging:
@@ -43,6 +54,6 @@ logging:
   tags: [
       "CIFAR100",
       "CLS",
-      "LeNet",
-      "Frequentist"
+      "AlexNet",
+      "Horseshoe"
     ]

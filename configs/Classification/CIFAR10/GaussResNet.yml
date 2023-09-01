@@ -1,29 +1,36 @@
 #### general settings
-name: FREQ
+name: Gauss
 train_type: CLS
 gpu_ids: [2]
 
 #### datasets
 data:
-  name: "ImageNet"
-  image_size: 64
+  name: "CIFAR10"
+  image_size: 32
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/LeNet_ImageNet/"
+  path: "./checkpoints/GaussResNet_CIFAR10/"
   save_checkpoint_freq: 2
 
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.005  # Learning rate
+  lr: 0.001  # Learning rate
   weight_decay: 0.001
 
 #### Model settings
 model:
-  name: "LeNet"
-  layer_type: Freq
+  name: "ResNet"
+  layer_type: "Gauss"
+
+  prior:
+    prior_mu: 0
+    prior_sigma: 0.01
+    posterior_mu_initial: [0, 0.01]
+    posterior_rho_initial: [-3, 0.01]
+
 
   in_channels: 3
   out_channels: 10
@@ -31,27 +38,18 @@ model:
 #### training settings: learning rate scheme, loss, optimizer
 train:
 
-  num_epochs: 1000
+  num_epochs: 200
   batch_size: 128
   train_size: 1
 
-  loss: "CE"
+  beta: 0.00001
 
 #### Logging
 logging:
   mode: online # disabled
   tags: [
-      "ImageNet",
-      "Classification",
-      "LeNet",
-      "Frequentist"
-    ]
-  #### Logging
-  logging:
-    mode: disabled # disabled
-    tags: [
-      "ImageNet",
-      "Classification",
-      "LeNet",
+      "CIFAR10",
+      "CLS",
+      "ResNet",
       "Gaussian"
     ]

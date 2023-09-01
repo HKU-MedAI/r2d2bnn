@@ -8,7 +8,11 @@ from layers import (
     BBBLinear,
     BBBConv2d,
     HorseshoeLinearLayer,
-    HorseshoeConvLayer
+    HorseshoeConvLayer,
+    RadialLinear,
+    RadialConv2d,
+    MFVILinear,
+    MFVIConv2d
 )
 
 
@@ -36,6 +40,10 @@ class BaseModel(nn.Module):
             return HorseshoeLinearLayer(in_dim, out_dim, self.priors)
         elif self.layer_type == "Gauss":
             return BBBLinear(in_dim, out_dim, self.priors)
+        elif self.layer_type == "RAD":
+            return RadialLinear(in_dim, out_dim, self.priors)
+        elif self.layer_type == "MFVI":
+            return MFVILinear(in_dim, out_dim, self.priors)
         elif self.layer_type == "Freq":
             return nn.Linear(in_dim, out_dim)
         else:
@@ -46,7 +54,11 @@ class BaseModel(nn.Module):
             return R2D2ConvLayer(in_dim, out_dim, self.priors, kernel, stride=stride, padding=padding)
         elif self.layer_type == "Gauss":
             return BBBConv2d(in_dim, out_dim, kernel, stride=stride, padding=padding, bias=True, priors=self.priors)
-        elif self.layer_type == "r2d2_cond":
+        elif self.layer_type == "RAD":
+            return RadialConv2d(in_dim, out_dim, kernel, stride=stride, padding=padding, bias=True, priors=self.priors)
+        elif self.layer_type == "MFVI":
+            return MFVIConv2d(in_dim, out_dim, kernel, stride=stride, padding=padding, bias=True, priors=self.priors)
+        elif self.layer_type == "R2D2C":
             return R2D2CondConvLayer(in_dim, out_dim, self.priors, kernel, stride=stride, padding=padding)
         elif self.layer_type == "Freq":
             return nn.Conv2d(in_dim, out_dim, kernel, stride=stride, padding=padding)

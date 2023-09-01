@@ -1,17 +1,17 @@
 #### general settings
-name: FREQ
+name: MCD
 train_type: CLS
 gpu_ids: [2]
 
 #### datasets
 data:
-  name: "ImageNet"
+  name: "TinyImageNet"
   image_size: 64
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/LeNet_ImageNet/"
+  path: "./checkpoints/LeNet_TinyImageNet/"
   save_checkpoint_freq: 2
 
 #### Optimizer settings
@@ -26,7 +26,7 @@ model:
   layer_type: Freq
 
   in_channels: 3
-  out_channels: 10
+  out_channels: 200
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
@@ -35,23 +35,16 @@ train:
   batch_size: 128
   train_size: 1
 
+  mcd: 0.2
+
   loss: "CE"
 
 #### Logging
 logging:
   mode: online # disabled
   tags: [
-      "ImageNet",
-      "Classification",
+      "TinyImageNet",
+      "CLS",
       "LeNet",
-      "Frequentist"
-    ]
-  #### Logging
-  logging:
-    mode: disabled # disabled
-    tags: [
-      "ImageNet",
-      "Classification",
-      "LeNet",
-      "Gaussian"
+      "MCD"
     ]

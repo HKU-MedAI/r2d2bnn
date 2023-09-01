@@ -50,7 +50,7 @@ logging:
   mode: online # disabled
   tags: [
       "CIFAR10",
-      "Classification",
+      "CLS",
       "LeNet",
       "Gaussian"
     ]

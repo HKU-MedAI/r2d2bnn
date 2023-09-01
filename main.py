@@ -1,9 +1,10 @@
-import argparse
+import wandb
 import random
 
 import torch
 
 import numpy as np
+
 np.seterr(all="ignore")
 
 from trainer import (
@@ -62,20 +63,50 @@ def benchmark_datasets(config):
 
 
 def main():
-    TASK = "OOD"
-    # DATASET = "CIFAR10"
-    DATASET = "MNIST/OMIGLOT"
-
-    config_name = "R2D2LeNet.yml"
-    config = load_config(config_name, config_dir="/".join([
-        ".", "configs", TASK, DATASET, ""]))
 
     seed = 512
     random.seed(seed)
     torch.manual_seed(seed)
 
-    trainer = parse_trainer(config)
-    trainer.train()
+    TASK = ["OOD", "Classification"][1]
+    DATASET = "/".join([
+        # "MNIST",
+        "CIFAR10",
+        # "CIFAR100",
+        # "SVHN",
+        # "TinyImageNet"
+        # "FashionMNIST"
+    ])
+
+    for config_name in [
+        # "AlexNet.yml",
+        # "GaussLeNet.yml",
+        # "HSAlexNet.yml",
+        # "HSLeNet.yml",
+        # "HSResNet.yml",
+        # "LeNet.yml",
+        # "MCDAlexNet.yml",
+        # "MCDLeNet.yml",
+        # "R2D2AlexNet.yml",
+        # "R2D2LeNet.yml",
+        # "R2D2ResNet50.yml",
+        # "R2D2ResNet101.yml"
+        # "R2D2VIT.yml"
+        # "GaussResNet.yml"
+        # "RADLeNet.yml",
+        # "MFVILeNet.yml",
+        # "MFVIResNet101.yml"
+        "DeepEnsembleAlexNet.yml",
+        "RADAlexNet.yml"
+    ]:
+
+        config = load_config(config_name, config_dir="/".join([
+            ".", "configs", TASK, DATASET, ""]))
+
+        trainer = parse_trainer(config)
+        trainer.train()
+
+        wandb.finish()
 
 
 if __name__ == "__main__":

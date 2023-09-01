@@ -14,6 +14,8 @@ import wandb
 
 from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
 
+from models import DeepEnsemble
+
 
 class Trainer(ABC):
     def __init__(self, config: OrderedDict) -> None:
@@ -50,9 +52,11 @@ class Trainer(ABC):
 
     def load_model(self):
         n_models = self.config_model.get("n_models")
-        self.model = parse_model(self.config_model)
+        self.model = parse_model(self.config_model, self.config_data["image_size"])
         if self.config["name"] != "HS":
             self.model = self.model.to(self.device)
+        if n_models:
+            self.model = DeepEnsemble(self.model, n_models)
 
     def initialize_logger(self, notes=""):
         name = "_".join(

@@ -6,9 +6,9 @@ import torch.nn.functional as F
 from losses import calculate_kl
 
 
-class RadialLinear(nn.Module):
+class MFVILinear(nn.Module):
     def __init__(self, in_features, out_features, bias=True, priors=None):
-        super(RadialLinear, self).__init__()
+        super(MFVILinear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.use_bias = bias
@@ -49,21 +49,12 @@ class RadialLinear(nn.Module):
     def forward(self, input, sample=True):
         if self.training or sample:
             W_eps = torch.empty(self.W_mu.size()).normal_(0, 1).to(self.device)
-            W_eps_norm = torch.norm(W_eps, p=2, dim=0)
-            W_eps_normalised = W_eps / W_eps_norm
-            W_r = torch.randn(1).to(self.device)
-            W_eps = W_eps_normalised * W_r
 
             self.W_sigma = torch.log1p(torch.exp(self.W_rho))
             weight = self.W_mu + W_eps * self.W_sigma
 
             if self.use_bias:
                 bias_eps = torch.empty(self.bias_mu.size()).normal_(0, 1).to(self.device)
-                bias_eps_norm = torch.norm(bias_eps, p=2, dim=0)
-                bias_eps_normalised = bias_eps / bias_eps_norm
-                bias_r = torch.randn(1).to(self.device)
-                bias_eps = bias_eps_normalised * bias_r
-
                 self.bias_sigma = torch.log1p(torch.exp(self.bias_rho))
                 bias = self.bias_mu + bias_eps * self.bias_sigma
             else:
@@ -75,7 +66,6 @@ class RadialLinear(nn.Module):
         return F.linear(input, weight, bias)
 
     def kl_loss(self):
-        kl = calculate_kl(self.prior_mu, self.prior_sigma, self.W_mu, self.W_sigma)
-        if self.use_bias:
-            kl += calculate_kl(self.prior_mu, self.prior_sigma, self.bias_mu, self.bias_sigma)
+        kl = torch.sum(torch.log(self.W_sigma)) + torch.sum(torch.log(self.bias_sigma))
+        kl -= 0.5 * (self.prior_mu ** 2 + self.prior_sigma ** 2)
         return kl

@@ -1,16 +1,24 @@
+import sys
+sys.path.append("..")
+
 import torch
-from torch import nn
-from torch.nn import Module, Parameter
+import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import Parameter
 
-from losses import calculate_kl
 
+class MFVIConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size,
+                 stride=(1,1), padding=0, dilation=(1,1), bias=True, priors=None):
 
-class RadialLinear(nn.Module):
-    def __init__(self, in_features, out_features, bias=True, priors=None):
-        super(RadialLinear, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
+        super(MFVIConv2d, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size if isinstance(kernel_size, tuple) else (kernel_size, kernel_size)
+        self.stride = stride
+        self.padding = padding
+        self.dilation = dilation
+        self.groups = 1
         self.use_bias = bias
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -26,12 +34,12 @@ class RadialLinear(nn.Module):
         self.posterior_mu_initial = priors['posterior_mu_initial']
         self.posterior_rho_initial = priors['posterior_rho_initial']
 
-        self.W_mu = Parameter(torch.empty((out_features, in_features), device=self.device))
-        self.W_rho = Parameter(torch.empty((out_features, in_features), device=self.device))
+        self.W_mu = Parameter(torch.empty((out_channels, in_channels, *self.kernel_size), device=self.device))
+        self.W_rho = Parameter(torch.empty((out_channels, in_channels, *self.kernel_size), device=self.device))
 
         if self.use_bias:
-            self.bias_mu = Parameter(torch.empty((out_features), device=self.device))
-            self.bias_rho = Parameter(torch.empty((out_features), device=self.device))
+            self.bias_mu = Parameter(torch.empty((out_channels), device=self.device))
+            self.bias_rho = Parameter(torch.empty((out_channels), device=self.device))
         else:
             self.register_parameter('bias_mu', None)
             self.register_parameter('bias_rho', None)
@@ -49,21 +57,11 @@ class RadialLinear(nn.Module):
     def forward(self, input, sample=True):
         if self.training or sample:
             W_eps = torch.empty(self.W_mu.size()).normal_(0, 1).to(self.device)
-            W_eps_norm = torch.norm(W_eps, p=2, dim=0)
-            W_eps_normalised = W_eps / W_eps_norm
-            W_r = torch.randn(1).to(self.device)
-            W_eps = W_eps_normalised * W_r
-
             self.W_sigma = torch.log1p(torch.exp(self.W_rho))
             weight = self.W_mu + W_eps * self.W_sigma
 
             if self.use_bias:
                 bias_eps = torch.empty(self.bias_mu.size()).normal_(0, 1).to(self.device)
-                bias_eps_norm = torch.norm(bias_eps, p=2, dim=0)
-                bias_eps_normalised = bias_eps / bias_eps_norm
-                bias_r = torch.randn(1).to(self.device)
-                bias_eps = bias_eps_normalised * bias_r
-
                 self.bias_sigma = torch.log1p(torch.exp(self.bias_rho))
                 bias = self.bias_mu + bias_eps * self.bias_sigma
             else:
@@ -72,10 +70,9 @@ class RadialLinear(nn.Module):
             weight = self.W_mu
             bias = self.bias_mu if self.use_bias else None
 
-        return F.linear(input, weight, bias)
+        return F.conv2d(input, weight, bias, self.stride, self.padding, self.dilation, self.groups)
 
     def kl_loss(self):
-        kl = calculate_kl(self.prior_mu, self.prior_sigma, self.W_mu, self.W_sigma)
-        if self.use_bias:
-            kl += calculate_kl(self.prior_mu, self.prior_sigma, self.bias_mu, self.bias_sigma)
+        kl = - torch.sum(torch.log(self.W_sigma)) + torch.sum(torch.log(self.bias_sigma))
+        kl += 0.5 * (self.prior_mu ** 2 + self.prior_sigma ** 2)
         return kl

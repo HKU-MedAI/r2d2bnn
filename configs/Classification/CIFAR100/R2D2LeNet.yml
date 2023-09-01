@@ -52,7 +52,7 @@ logging:
   mode: online # disabled
   tags: [
       "CIFAR100",
-      "Classification",
+      "CLS",
       "LeNet",
       "R2D2",
       "Marginal",
