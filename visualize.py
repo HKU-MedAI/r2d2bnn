@@ -91,8 +91,8 @@ horseshoe = horseshoe_checkpoint.load_model()
 bnn = bnn_checkpoint.load_model()
 
 # Load BNN models
-r2d2 = read_model("./configs/R2D2MLP_Simulation.yml", r2d2)
-horseshoe = read_model("./configs/HorseshoeMLP_Simulation.yml", horseshoe)
+r2d2 = read_model("configs/Regression/R2D2MLP_Simulation.yml", r2d2)
+horseshoe = read_model("configs/Regression/HSMLP_Simulation.yml", horseshoe)
 bnn = read_model("./configs/BMLP_Simulation.yml", bnn)
 
 # Load the first layer

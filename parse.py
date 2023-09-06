@@ -109,7 +109,7 @@ def parse_model(config_model, image_size=32):
             priors=priors,
             image_size=image_size
         )
-    elif model_name == "ResNet":
+    elif model_name == "ResNet50":
         return ResNet(
             outputs=out_dim,
             inputs=in_dim,

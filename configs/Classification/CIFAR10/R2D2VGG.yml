@@ -1,7 +1,6 @@
 #### general settings
 name: R2D2M
 train_type: CLS
-eval_type: bnn
 gpu_ids: [2]
 
 
@@ -13,7 +12,7 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/R2D2_ResNet101_CIFAR10/"
+  path: "./checkpoints/R2D2_VGG_CIFAR10/"
   save_checkpoint_freq: 2
 
 
@@ -25,7 +24,7 @@ optimizer:
 
 #### Model Settings
 model:
-  name: "ResNet101"
+  name: "VGG"
   layer_type: R2D2M
 
   prior:

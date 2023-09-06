@@ -109,7 +109,7 @@ class R2D2LinearLayer(nn.Module):
         # self.bias_mu.data.normal_(*self.posterior_mu_initial)
         self.bias_rho.data.normal_(*self.priors["bias_rho_scale"])
 
-    def forward(self, input_, sample=True, n_samples=25):
+    def forward(self, input_, sample=True, n_samples=10):
         """
         Performs a forward pass through the layer, that is, computes
         the layer output for a given input batch.

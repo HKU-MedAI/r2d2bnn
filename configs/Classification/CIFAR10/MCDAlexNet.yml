@@ -37,8 +37,6 @@ train:
 
   mcd: 0.2
 
-  loss: "CE"
-
 #### Logging
 logging:
   mode: online # disabled

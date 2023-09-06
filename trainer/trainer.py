@@ -9,6 +9,8 @@ from checkpoint import CheckpointManager
 from parse import parse_model
 import utils
 from matplotlib import pyplot as plt
+import plotly
+import plotly.graph_objects as go
 
 import wandb
 
@@ -45,6 +47,9 @@ class Trainer(ABC):
         self.device = "cuda" if config['gpu_ids'] else "cpu"
         self.use_gpu = True if self.device == "cuda" else False
 
+        # KL Annealing
+        self.beta = self.config_train.get("beta") if self.config_train.get("beta") else 0
+
         self.load_model()
 
     def train(self) -> None:
@@ -52,7 +57,8 @@ class Trainer(ABC):
 
     def load_model(self):
         n_models = self.config_model.get("n_models")
-        self.model = parse_model(self.config_model, self.config_data["image_size"])
+        image_size = self.config_data.get("image_size")
+        self.model = parse_model(self.config_model, image_size)
         if self.config["name"] != "HS":
             self.model = self.model.to(self.device)
         if n_models:
@@ -82,6 +88,8 @@ class Trainer(ABC):
         pred: (S, N)
         label (N) ground truth of the function
         """
+        pred = pred.detach().cpu().numpy().squeeze()
+
         pth = self.checkpoint_manager.path / "conf_int.png"
         labels_path = self.checkpoint_manager.path / "labels.npy"
         pred_path = self.checkpoint_manager.path / "pred.npy"
@@ -93,19 +101,44 @@ class Trainer(ABC):
         indices = np.argsort(x[:, 0])
 
         fig, ax = plt.subplots()
+        fig = go.Figure()
+        # fig.add_trace(go.Scatter(x=x[indices, 0], y=lower[indices], mode="lines"))
+        # fig.add_trace(go.Scatter(x=x[indices, 0], y=upper[indices], mode="lines", fill='tonexty'))
+        # fig.add_trace(go.Scatter(
+        #     x=x[indices, 0] + x[indices, 0][::-1],
+        #     y=upper[indices] +lower[indices][::-1],
+        #     fill='toself',
+        #     fillcolor='rgba(0,50,120,0.5)',
+        #     line_color='rgba(255,255,255,0)',
+        #     showlegend=False,
+        #     name='Fair',
+        # ))
+        # fig.add_trace(go.Scatter(
+        #     x=x[indices, 0], y=mean[indices],
+        #     line_color='rgb(0,100,80)',
+        #     name='Fair',
+        # ))
+        # fig.add_trace(go.Scatter(x=x[indices, 0], y=label[indices]))
+        # fig.update_traces(mode='lines')
+        # fig.add_trace(go.Scatter(x=x[indices, 0], y=mean[indices]))
         ax.scatter(x[indices, 0], label[indices])
         ax.scatter(x[indices, 0], mean[indices])
         ax.fill_between(x[indices, 0], lower[indices], upper[indices], color='b', alpha=.5)
-
-        plt.xlim([-5, 5])
-        plt.ylim([-200, 200])
+        # fig.update_xaxes(range=[-5, 5])
+        # fig.update_yaxes(range=[-200, 200])
+        # plt.xlim([-5, 5])
+        # plt.ylim([-200, 200])
 
         # Save figure to checkpoint
-        plt.savefig(pth, dpi=1200)
+        # fig.write_image(pth)
+
 
         # Save labels
         np.save(labels_path, label)
         np.save(pred_path, pred)
+
+        wandb.log({"chart": wandb.Image(plt)})
+        plt.savefig(pth, dpi=1200)
 
         plt.close()
 

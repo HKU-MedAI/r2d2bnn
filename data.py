@@ -143,7 +143,7 @@ class SimulatedDataset(Dataset):
             self.y = (np.einsum("ij, i -> j", x, beta) + eps)
         elif scenario == 6:  # Neural network case
             p = 1000
-            net = MultipleLinear(1, p, 2)
+            net = MLP(1, p, "Freq", n_blocks=2)
             x = np.random.uniform(-5, 5, size=(p, n)).astype(np.float32)
             eps = np.random.normal(loc=mean, scale=2, size=n)
 

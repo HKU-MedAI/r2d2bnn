@@ -10,7 +10,6 @@ class MLP(BaseModel):
         self.num_classes = outputs
         self.priors = priors
         self.layer_type = layer_type
-        self.act = self.get_activation()
 
         self.n_blocks = n_blocks
 
@@ -27,7 +26,7 @@ class MLP(BaseModel):
 
         for l in range(self.n_blocks):
             self.dense_block.add_module(f"fc{l}", linears[l])
-            self.dense_block.add_module(f"act{l}", self.act())
+            self.dense_block.add_module(f"act{l}", self.act)
             out_channel = linears[l].out_features
 
         fc_out = self.get_fc_layer(out_channel, outputs)

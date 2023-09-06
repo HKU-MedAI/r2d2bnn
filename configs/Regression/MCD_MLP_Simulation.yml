@@ -1,7 +1,6 @@
 #### general settings
-name: BNN
-train_type: bnn-linreg
-eval_type: bn
+name: MFVI
+train_type: linreg
 gpu_ids: [2]
 
 
@@ -13,7 +12,7 @@ data:
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/BMLP_L3_S6/"
+  path: "./checkpoints/MFVI_MLP_L3_S6/"
   save_checkpoint_freq: 5
 
 

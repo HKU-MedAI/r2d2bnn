@@ -6,20 +6,20 @@ gpu_ids: [2]
 
 #### datasets
 data:
-  name: "CIFAR10"
+  name: "CIFAR100"
   image_size: 32
   train_path: None
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/MFVIAlexNet_CIFAR10/"
+  path: "./checkpoints/MFVIAlexNet_CIFAR100/"
   save_checkpoint_freq: 5
 
 
 #### Optimizer settings
 optimizer:
   opt_method: "ADAM"
-  lr: 0.003  # Learning rate
+  lr: 0.005  # Learning rate
   weight_decay: 0.001
 
 #### Model Settings
@@ -31,16 +31,16 @@ model:
     prior_mu: 0
     prior_sigma: 0.01
     posterior_mu_initial: [0, 0.01]
-    posterior_rho_initial: [-3.5, 0.01]
+    posterior_rho_initial: [-3, 0.01]
 
   in_channels: 3
-  out_channels: 10
+  out_channels: 100
 
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
 
-  num_epochs: 1000
+  num_epochs: 500
   batch_size: 128
   beta: 0.001
   train_size: 1
@@ -49,7 +49,7 @@ train:
 logging:
   mode: online # disabled
   tags: [
-      "CIFAR10",
+      "CIFAR100",
       "CLS",
       "AlexNet",
       "MFVI"

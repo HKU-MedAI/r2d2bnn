@@ -1,20 +1,19 @@
 #### general settings
 name: Gauss
-train_type: CLS
+train_type: REG
 gpu_ids: [2]
 
 
 #### datasets
 data:
-  name: "CIFAR10"
-  image_size: 32
-  train_path: None
+  name: "simulated"
+  n: 10000
+  scenario: 6
 
 #### Checkpoint settings
 checkpoints:
-  path: "./checkpoints/BAlexNet_CIFAR10/"
+  path: "./checkpoints/BMLP_L3_S6/"
   save_checkpoint_freq: 5
-
 
 #### Optimizer settings
 optimizer:
@@ -22,35 +21,33 @@ optimizer:
   lr: 0.005  # Learning rate
   weight_decay: 0.001
 
-#### Model Settings
 model:
-  name: AlexNet
+  name: MLP
   layer_type: Gauss
+
+  n_blocks: 3
 
   prior:
     prior_mu: 0
-    prior_sigma: 0.01
-    posterior_mu_initial: [0, 0.01]
-    posterior_rho_initial: [-3, 0.01]
+    prior_sigma: 0.1
+    posterior_mu_initial: [ 0, 0.01 ]
+    posterior_rho_initial: [ -4, 0.01 ]
 
-  in_channels: 3
-  out_channels: 10
-
+  in_channels: 1000
+  out_channels: 1
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
+  model_name: "BMLP"
 
-  num_epochs: 500
+  num_epochs: 100
   batch_size: 128
-  beta: 0.001
-  train_size: 1
 
 #### Logging
 logging:
   mode: online # disabled
   tags: [
-      "CIFAR10",
-      "CLS",
-      "AlexNet",
+      "REG",
+      "MLP",
       "Gaussian"
-    ]
+  ]

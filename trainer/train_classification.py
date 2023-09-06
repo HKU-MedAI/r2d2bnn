@@ -27,9 +27,6 @@ class ClassificationTrainer(Trainer):
         self.dataloader, self.valid_loader = load_data(self.config_data, self.batch_size, self.config_data["image_size"])
         self.optimzer = parse_optimizer(self.config_optim, self.model.parameters())
 
-        # KL Annealing
-        self.beta = self.config_train.get("beta") if self.config_train.get("beta") else 0
-
     def train_one_step(self, data, label):
         self.optimzer.zero_grad()
 
@@ -45,7 +42,7 @@ class ClassificationTrainer(Trainer):
 
         self.optimzer.step()
 
-        return loss.item(), kl_loss.item(), nll_loss.item(), log_outputs
+        return loss.item(), kl_loss.item(), nll_loss.item(), log_outputs.detach().cpu()
 
     def validate(self):
         probs = []
@@ -90,6 +87,9 @@ class ClassificationTrainer(Trainer):
 
                 probs.append(log_outputs)
                 labels.append(label)
+
+            if hasattr(self.model, "analytic_update"):
+                self.model.analytic_update()
 
             probs = torch.cat(probs)
             labels = torch.cat(labels)

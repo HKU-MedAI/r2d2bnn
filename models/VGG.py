@@ -7,10 +7,6 @@ from torchvision.models import vgg11
 import random
 
 from .Base import BaseModel
-from layers import (
-    BBBLinear,
-    BBBConv2d
-)
 
 
 class VGG(BaseModel):

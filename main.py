@@ -8,7 +8,7 @@ import numpy as np
 np.seterr(all="ignore")
 
 from trainer import (
-    BLinearRegTrainer,
+    LinearRegTrainer,
     R2D2LinearRegTrainer,
     HorseshoeLinearRegTrainer,
     MCDLinearRegTrainer,
@@ -27,16 +27,16 @@ def parse_trainer(config):
     if mode == "train":
         if config["train_type"] == "CLS":
             trainer = ClassificationTrainer(config)
-        elif config["train_type"] == "bnn-linreg":
-            trainer = BLinearRegTrainer(config)
+        elif config["train_type"] == "OOD":
+            trainer = UncertaintyTrainer(config)
+        elif config["train_type"] == "REG":
+            trainer = LinearRegTrainer(config)
         elif config["train_type"] == "r2d2-linreg":
             trainer = R2D2LinearRegTrainer(config)
         elif config["train_type"] == "horseshoe-linreg":
             trainer = HorseshoeLinearRegTrainer(config)
         elif config["train_type"] == "mcd-linreg":
             trainer = MCDLinearRegTrainer(config)
-        elif config["train_type"] == "OOD":
-            trainer = UncertaintyTrainer(config)
         else:
             raise NotImplementedError(f"Trainer of type {config['train_type']} is not implemented")
     else:
@@ -68,14 +68,16 @@ def main():
     random.seed(seed)
     torch.manual_seed(seed)
 
-    TASK = ["OOD", "Classification"][1]
+    TASK = ["OOD", "Classification", "Regression"][1]
     DATASET = "/".join([
         # "MNIST",
         "CIFAR10",
         # "CIFAR100",
-        # "SVHN",
         # "TinyImageNet"
-        # "FashionMNIST"
+        # "FashionMNIST",
+        # "OMIGLOT",
+        # "SVHN",
+
     ])
 
     for config_name in [
@@ -91,13 +93,16 @@ def main():
         # "R2D2LeNet.yml",
         # "R2D2ResNet50.yml",
         # "R2D2ResNet101.yml"
-        # "R2D2VIT.yml"
+        # "R2D2VIT.yml",
+        # "R2D2VGG.yml",
         # "GaussResNet.yml"
         # "RADLeNet.yml",
         # "MFVILeNet.yml",
         # "MFVIResNet101.yml"
-        "DeepEnsembleAlexNet.yml",
-        "RADAlexNet.yml"
+        # "MFVIAlexNet.yml",
+        # "DeepEnsembleAlexNet.yml",
+        # "RADAlexNet.yml"
+        # "GaussAlexNet.yml"
     ]:
 
         config = load_config(config_name, config_dir="/".join([

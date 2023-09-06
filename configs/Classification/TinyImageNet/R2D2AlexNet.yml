@@ -42,7 +42,7 @@ model:
 
 #### training settings: learning rate scheme, loss, optimizer
 train:
-  num_epochs: 2000
+  num_epochs: 500
   batch_size: 1024
   train_size: 1
 

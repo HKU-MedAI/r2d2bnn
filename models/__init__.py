@@ -6,7 +6,7 @@ from .CNN import CNN
 from .LeNet import LeNet
 from .AlexNet import AlexNet
 from .SimpleCNN import SimpleCNN
-from .ResNet import ResNet
+from .ResNet50 import ResNet
 from .ResNet101 import ResNet101
 from .VGG import VGG
 from .MLP import MLP
